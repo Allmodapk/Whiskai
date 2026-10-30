@@ -1,0 +1,7 @@
+{
+  "name": "Reference Control Studio",
+  "description": "Take control of your AI image references. Analyze references, lock what matters, build reusable blueprints, and create production-ready prompts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
