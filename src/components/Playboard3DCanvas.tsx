@@ -172,6 +172,13 @@ export function computeOpticalBokehParams(
   };
 }
 
+export const isMobileDevice = () =>
+  typeof navigator !== 'undefined' &&
+  (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  ) ||
+    (typeof window !== 'undefined' && window.innerWidth < 768));
+
 // Reusable math objects outside render loop (Zero GC)
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -577,6 +584,9 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
   const poseStateRef = useRef(poseSettings);
   poseStateRef.current = poseSettings;
 
+  const wakeLoopRef = useRef<() => void>(() => {});
+  const isInteractingRef = useRef<boolean>(false);
+
   const liveFramingAnalysis = useMemo(
     () => analyzePlayboardFraming(cameraSettings, poseSettings),
     [cameraSettings, poseSettings]
@@ -807,6 +817,7 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
         }
       }
     }
+    wakeLoopRef.current();
   }, [
     poseSettings.characterYawDeg,
     poseSettings.characterPosX,
@@ -820,6 +831,7 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
     if (!showJoysticks) {
       resetAllControlInputs();
     }
+    wakeLoopRef.current();
   }, [showJoysticks]);
 
   // Update target camera state and pinned shot camera when external cameraSettings props change
@@ -849,6 +861,7 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
         cameraRef.current.updateProjectionMatrix();
       }
     }
+    wakeLoopRef.current();
   }, [cameraSettings]);
 
   const syncSceneLightingAndBackground = (
@@ -1159,14 +1172,22 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
       100
     );
 
+    const isMobile = isMobileDevice();
+
     const renderer = new THREE.WebGLRenderer({
-      antialias: !isSoftwareGl,
+      antialias: !isSoftwareGl && !isMobile,
       powerPreference: 'high-performance',
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
     });
     rendererRef.current = renderer;
     renderer.setSize(width, height, false);
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(
+      isSoftwareGl
+        ? 1
+        : isMobile
+        ? Math.min(window.devicePixelRatio, 1.0)
+        : Math.min(window.devicePixelRatio, 1.5)
+    );
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.82;
@@ -1200,7 +1221,8 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
     const keyLight = new THREE.DirectionalLight(0xfff1dc, 1.65);
     keyLight.position.set(-4.2, 5.2, 3.2);
     keyLight.castShadow = !isSoftwareGl;
-    keyLight.shadow.mapSize.set(isSoftwareGl ? 512 : 2048, isSoftwareGl ? 512 : 2048);
+    const shadowSize = isSoftwareGl ? 512 : isMobile ? 1024 : 2048;
+    keyLight.shadow.mapSize.set(shadowSize, shadowSize);
     keyLight.shadow.camera.left = -3.4;
     keyLight.shadow.camera.right = 3.4;
     keyLight.shadow.camera.top = 3.4;
@@ -4236,8 +4258,8 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
         Math.max(1, Math.round(width * pixelRatio)),
         Math.max(1, Math.round(height * pixelRatio)),
         {
-          type: THREE.HalfFloatType,
-          samples: 4,
+          type: isMobile ? THREE.UnsignedByteType : THREE.HalfFloatType,
+          samples: isMobile || isSoftwareGl ? 0 : 4,
         }
       );
 
@@ -4347,6 +4369,9 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
       if (ownedUiPointerIdsRef.current.has(e.pointerId) || e.target !== canvas) {
         return;
       }
+
+      isInteractingRef.current = true;
+      wakeLoopRef.current();
 
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       try {
@@ -4760,7 +4785,9 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
       if (activePointers.size === 0) {
         wasMultiTouchGesture = false;
         canvasGestureType = 'none';
+        isInteractingRef.current = false;
       }
+      wakeLoopRef.current();
 
       try {
         canvas.releasePointerCapture(e.pointerId);
@@ -4771,6 +4798,7 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      wakeLoopRef.current();
       if (isFreeOrbitViewRef.current) {
         freeOrbitStateRef.current.dist = Math.max(
           0.9,
@@ -4803,6 +4831,7 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
       if (k === 'd' || e.key === 'ArrowRight') keyMoveRef.current.d = true;
       if (k === 'q') keyMoveRef.current.q = true;
       if (k === 'e') keyMoveRef.current.e = true;
+      wakeLoopRef.current();
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -4813,6 +4842,7 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
       if (k === 'd' || e.key === 'ArrowRight') keyMoveRef.current.d = false;
       if (k === 'q') keyMoveRef.current.q = false;
       if (k === 'e') keyMoveRef.current.e = false;
+      wakeLoopRef.current();
     };
 
     const onWindowBlurOrHide = () => {
@@ -4868,6 +4898,18 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
     let frameId = 0;
     const clock = new THREE.Clock();
     let animTime = 0;
+    let activityTicks = 120;
+    let isLoopRunning = false;
+
+    const wakeLoop = () => {
+      activityTicks = 90;
+      if (!isLoopRunning) {
+        isLoopRunning = true;
+        clock.getDelta();
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+    wakeLoopRef.current = wakeLoop;
 
     function afterDraw(cb: () => void) {
       const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -5139,6 +5181,11 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
     const _pelvisWorld = new THREE.Vector3();
 
     const tick = () => {
+      if (document.hidden) {
+        isLoopRunning = false;
+        return;
+      }
+
       const dt = Math.min(clock.getDelta(), 0.05);
       const isPaused = animPausedRef.current;
       if (!isPaused) {
@@ -5149,14 +5196,29 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
       const cTarget = camTargetStateRef.current;
       const cCurr = camCurrentStateRef.current;
 
+      const mv = moveStickRef.current;
+      const km = keyMoveRef.current;
+      const isUserDragging = canvasGestureType !== 'none' || draggingHandle !== null || activePointers.size > 0 || isInteractingRef.current;
+      const isStickMoving = Math.abs(mv.x) > 0.01 || Math.abs(mv.y) > 0.01 ||
+                           Math.abs(lookStickRef.current.x) > 0.01 || Math.abs(lookStickRef.current.y) > 0.01 ||
+                           Math.abs(charTurnInputRef.current) > 0.01;
+      const isKeyMoving = km.w || km.s || km.a || km.d || km.q || km.e;
+      const isLocomoting = isStickMoving || isKeyMoving || playerPosRef.current.walkAmt > 0.01 || playerPosRef.current.gaitMode !== 'idle';
+      const isTransitioning = poseTransitionRef.current !== null;
+      const isGltfAnimating = gltfMixerRef.current !== null && !isPaused;
+
+      if (isUserDragging || isStickMoving || isKeyMoving || isLocomoting || isTransitioning || isGltfAnimating) {
+        activityTicks = 90;
+      } else {
+        activityTicks--;
+      }
+
       // Update optional GLTF mixer if active
       if (gltfMixerRef.current && !isPaused) {
         gltfMixerRef.current.update(dt);
       }
 
       // Combine Left Movement Joystick & Keyboard WASD for Character Movement
-      const mv = moveStickRef.current;
-      const km = keyMoveRef.current;
       const keyX = (km.d ? 1 : 0) - (km.a ? 1 : 0);
       const keyY = (km.w ? 1 : 0) - (km.s ? 1 : 0);
       const activeStick = {
@@ -6145,7 +6207,22 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
         if (uniforms['focus']) uniforms['focus'].value = dofParams.focusDistance;
         if (uniforms['aperture']) uniforms['aperture'].value = dofParams.aperture;
         if (uniforms['maxblur']) uniforms['maxblur'].value = dofParams.maxBlur;
-        bokehPass.enabled = dofParams.maxBlur > 0.0002;
+
+        // Bypass heavy depth-of-field and bloom postprocessing during active scene manipulation for max performance
+        const isManipulating =
+          isInteractingRef.current ||
+          draggingHandle !== null ||
+          canvasGestureType !== 'none' ||
+          Math.abs(mv.x) > 0.01 ||
+          Math.abs(mv.y) > 0.01 ||
+          Math.abs(lookStickRef.current.x) > 0.01 ||
+          Math.abs(lookStickRef.current.y) > 0.01;
+
+        bokehPass.enabled = !isManipulating && dofParams.maxBlur > 0.0002;
+        if (bloomPass) {
+          bloomPass.enabled = !isManipulating;
+        }
+
         composer.render(dt);
       } else {
         renderer.render(scene, camera);
@@ -6227,14 +6304,18 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
         leftWallPlasterMat.opacity = savedLeftOpacity;
       }
 
-      if (isSoftwareGl) {
-        afterDraw(tick);
+      if (activityTicks > 0) {
+        if (isSoftwareGl) {
+          afterDraw(tick);
+        } else {
+          frameId = requestAnimationFrame(tick);
+        }
       } else {
-        frameId = requestAnimationFrame(tick);
+        isLoopRunning = false;
       }
     };
 
-    frameId = requestAnimationFrame(tick);
+    wakeLoop();
 
     // Cleanup
     return () => {
@@ -6254,6 +6335,30 @@ export const Playboard3DCanvas: React.FC<Playboard3DCanvasProps> = ({
       canvas.removeEventListener('pointercancel', onPointerUp);
       canvas.removeEventListener('lostpointercapture', onPointerUp);
       canvas.removeEventListener('wheel', onWheel);
+
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.geometry) {
+          mesh.geometry.dispose();
+        }
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((m) => {
+              const mat = m as THREE.MeshStandardMaterial;
+              if (mat.map) mat.map.dispose();
+              if (mat.normalMap) mat.normalMap.dispose();
+              if (mat.bumpMap) mat.bumpMap.dispose();
+              m.dispose();
+            });
+          } else {
+            const m = mesh.material as THREE.MeshStandardMaterial;
+            if (m.map) m.map.dispose();
+            if (m.normalMap) m.normalMap.dispose();
+            if (m.bumpMap) m.bumpMap.dispose();
+            m.dispose();
+          }
+        }
+      });
 
       composer?.dispose();
       renderer.dispose();
