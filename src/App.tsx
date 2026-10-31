@@ -497,7 +497,7 @@ export default function App() {
         const rawDataUrl = e.target?.result as string;
         const img = new Image();
         img.onload = () => {
-          const MAX_DIM = 1280;
+          const MAX_DIM = 1024;
           let width = img.width;
           let height = img.height;
 
@@ -517,7 +517,7 @@ export default function App() {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
             const base64 = optimizedDataUrl.split(',')[1];
             resolve({
               id: 'img_' + Date.now() + Math.random().toString(36).slice(2, 6),
@@ -693,12 +693,13 @@ export default function App() {
 
       const data = await postApiJson<any>('/api/analyze-reference', payload, {
         customKey,
-        timeoutMs: 110000,
+        timeoutMs: 45000,
         maxRetries: 2,
       });
 
       clearInterval(timer);
       setScanStageIndex(9);
+      setFallbackNotice(typeof data.warning === 'string' && data.warning.trim() ? data.warning : null);
 
       const analysis = data.analysis || {};
       setScanSummary(analysis.summary || 'Reference analyzed into 13 grounded visual components.');
@@ -780,7 +781,7 @@ export default function App() {
       triggerHaptic();
     } catch (err: any) {
       clearInterval(timer);
-      console.error(err);
+      setFallbackNotice(null);
       setScanError(extractApiErrorMessage(err, 'Reference analysis could not be completed.'));
     } finally {
       setIsScanning(false);

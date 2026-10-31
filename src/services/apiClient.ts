@@ -155,7 +155,7 @@ export async function postApiJson<T = any>(
     );
   }
 
-  const timeoutMs = options.timeoutMs ?? 110000;
+  const timeoutMs = options.timeoutMs ?? 45000;
   const maxRetries = options.maxRetries ?? 2;
 
   const headers: Record<string, string> = {
@@ -268,22 +268,28 @@ export async function postApiJson<T = any>(
         throw lastError;
       }
 
-      const cleanMessage = extractApiErrorMessage(
+      const rawMessage = extractApiErrorMessage(
         err,
         'Network connection to the analysis server was interrupted.'
       );
-      lastError = new Error(cleanMessage);
 
       // Retry transient network errors
       const isNetworkErr =
-        cleanMessage.includes('Failed to fetch') ||
-        cleanMessage.includes('NetworkError') ||
-        cleanMessage.includes('interrupted');
+        rawMessage.includes('Failed to fetch') ||
+        rawMessage.includes('NetworkError') ||
+        rawMessage.includes('Load failed') ||
+        rawMessage.includes('interrupted');
 
       if (isNetworkErr && attempt < maxRetries) {
         await sleep(800 * (attempt + 1));
         continue;
       }
+
+      lastError = new Error(
+        isNetworkErr
+          ? 'Connection to the analysis server was interrupted. Please check your connection and try again.'
+          : rawMessage
+      );
 
       throw lastError;
     }
