@@ -48,6 +48,7 @@ import { CameraAngleController } from './components/CameraAngleController';
 import { CameraPlayboardStudio } from './components/CameraPlayboardStudio';
 import { ReferenceViewfinder } from './components/ReferenceViewfinder';
 import { FloatingPromptDock } from './components/FloatingPromptDock';
+import { SwapStudio } from './components/SwapStudio';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Wrench,
@@ -1957,8 +1958,8 @@ export default function App() {
                     {
                       id: 'subject_swapping',
                       num: '02',
-                      title: '2. Subject Swapping',
-                      desc: 'Keep the reference pose, lighting, and scene while replacing the subject with a saved or uploaded identity.',
+                      title: '2. Swap Studio',
+                      desc: 'Modular multi-image subject swapping with 4 locked presets, Source Matrix switches, and deterministic prompt assembly.',
                       icon: UserCheck,
                     },
                     {
@@ -2083,6 +2084,12 @@ export default function App() {
               )}
             </div>
 
+            {(activeTool as string) === 'subject_swapping' ? (
+              <SwapStudio
+                optimizeImageFile={optimizeImageFile}
+                onOpenProjects={() => setActiveNav('projects')}
+              />
+            ) : (
             <>
               {/* Tool-Specific Configuration Panel for Tool 2: Subject Swapping */}
                 {activeTool === 'subject_swapping' && (
@@ -3223,6 +3230,7 @@ export default function App() {
                   </div>
                 )}
               </>
+            )}
           </motion.div>
         )}
 
