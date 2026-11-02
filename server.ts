@@ -189,10 +189,68 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   });
 }
 
-function parseModelJson(raw: string): any {
+function repairTruncatedJsonString(input: string): string {
+  let s = input.trim();
+  const firstBrace = s.indexOf('{');
+  if (firstBrace > 0) {
+    s = s.slice(firstBrace);
+  }
+  s = s.replace(/[\u0000-\u001F]+/g, ' ');
+
+  // Track open quotes, braces, brackets
+  let inString = false;
+  let escaped = false;
+  const stack: string[] = [];
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (ch === '{') stack.push('}');
+      else if (ch === '[') stack.push(']');
+      else if (ch === '}' || ch === ']') {
+        if (stack.length > 0 && stack[stack.length - 1] === ch) {
+          stack.pop();
+        }
+      }
+    }
+  }
+
+  if (inString) {
+    s += '"';
+  }
+  // Remove trailing comma or colon before closing braces
+  s = s.replace(/[,:\s]+$/, '');
+  while (stack.length > 0) {
+    s += stack.pop();
+  }
+  return s;
+}
+
+function parseModelJsonWithMeta(raw: string): {
+  parsed: any;
+  jsonParseSucceeded: boolean;
+  jsonRepaired: boolean;
+  repairNote?: string;
+} {
   const trimmed = raw.trim();
   try {
-    return JSON.parse(trimmed);
+    return {
+      parsed: JSON.parse(trimmed),
+      jsonParseSucceeded: true,
+      jsonRepaired: false,
+    };
   } catch {
     const cleaned = trimmed
       .replace(/^```json\s*/i, '')
@@ -200,23 +258,55 @@ function parseModelJson(raw: string): any {
       .replace(/```\s*$/i, '')
       .trim();
     try {
-      return JSON.parse(cleaned);
+      return {
+        parsed: JSON.parse(cleaned),
+        jsonParseSucceeded: true,
+        jsonRepaired: false,
+      };
     } catch {
       const firstBrace = cleaned.indexOf('{');
       const lastBrace = cleaned.lastIndexOf('}');
       if (firstBrace !== -1 && lastBrace > firstBrace) {
         const candidate = cleaned.slice(firstBrace, lastBrace + 1);
         try {
-          return JSON.parse(candidate);
+          return {
+            parsed: JSON.parse(candidate),
+            jsonParseSucceeded: true,
+            jsonRepaired: true,
+            repairNote: 'Extracted JSON object from surrounding text',
+          };
         } catch {
-          // Sanitize unescaped control characters inside JSON string literals if present
-          const sanitized = candidate.replace(/[\u0000-\u001F]+/g, ' ');
-          return JSON.parse(sanitized);
+          try {
+            const sanitized = candidate.replace(/[\u0000-\u001F]+/g, ' ');
+            return {
+              parsed: JSON.parse(sanitized),
+              jsonParseSucceeded: true,
+              jsonRepaired: true,
+              repairNote: 'Sanitized control characters in JSON',
+            };
+          } catch {
+            // Fall through to truncation repair
+          }
         }
       }
-      throw new Error('Model response did not contain valid JSON.');
+
+      try {
+        const repaired = repairTruncatedJsonString(cleaned);
+        return {
+          parsed: JSON.parse(repaired),
+          jsonParseSucceeded: true,
+          jsonRepaired: true,
+          repairNote: 'Closed truncated JSON structure',
+        };
+      } catch {
+        throw new Error('Model response did not contain valid JSON.');
+      }
     }
   }
+}
+
+function parseModelJson(raw: string): any {
+  return parseModelJsonWithMeta(raw).parsed;
 }
 
 function isQuotaOrServiceUnavailable(err: any): boolean {
@@ -522,17 +612,51 @@ function buildCameraReferenceQuotaFallback(base64Data?: string) {
   };
 }
 
-// Resilient model call helper with multi-key support, fast per-model timeout, and bounded total execution time
+const SERVER_SHARED_KEYS = [
+  'camera',
+  'framing',
+  'lighting',
+  'background',
+  'environment',
+  'composition',
+  'interaction',
+] as const;
+
+const SERVER_PERSON_KEYS = [
+  'subject',
+  'body',
+  'pose',
+  'clothing',
+  'facial_expression',
+  'hand_gestures',
+  'leg_gestures',
+] as const;
+
+const SERVER_CORE_13_KEYS = [
+  'subject',
+  'body',
+  'pose',
+  'camera',
+  'framing',
+  'clothing',
+  'lighting',
+  'background',
+  'environment',
+  'composition',
+  'facial_expression',
+  'hand_gestures',
+  'leg_gestures',
+] as const;
+
+// Normalize and canonicalize scan analysis (supports single, multi, and solo shapes)
 function normalizeScanAnalysis(rawAnalysis: any, clientOutputRatio?: string): any {
   if (!rawAnalysis || typeof rawAnalysis !== 'object') return rawAnalysis;
 
   const cleanText = (str: any): string => {
     if (typeof str !== 'string') return '';
     let t = str.trim();
-    // Ban hedging words in detectedText
     t = t.replace(/\b(or|\/)\b/gi, ' ');
     t = t.replace(/\b(appears|seems|possibly|approximately)\b/gi, '');
-    // Clean double spaces
     t = t.replace(/\s{2,}/g, ' ').trim();
     return t;
   };
@@ -544,52 +668,181 @@ function normalizeScanAnalysis(rawAnalysis: any, clientOutputRatio?: string): an
     return words.slice(0, 15).join(' ');
   };
 
-  // Process leadSentence & styleCategory
+  const normalizeCompEntry = (key: string, entry: any): any => {
+    if (!entry) return null;
+    if (typeof entry === 'string') {
+      const dt = cleanText(entry);
+      return {
+        detectedText: dt,
+        explanation: 'Extracted from reference frame',
+        visibility: dt ? 'visible' : 'unavailable',
+        confidence: 'high',
+      };
+    }
+    if (typeof entry === 'object') {
+      const rawDt =
+        entry.detectedText ?? entry.description ?? entry.text ?? entry.value ?? '';
+      let dt = cleanText(rawDt);
+      if (key === 'camera' && dt) {
+        const lower = dt.toLowerCase();
+        if (
+          (lower.includes('floor-level') ||
+            lower.includes('below seat') ||
+            lower.includes('near floor') ||
+            lower.includes('low-angle')) &&
+          lower.includes('eye-level')
+        ) {
+          dt = dt.replace(/\beye-level\b/gi, 'low camera elevation');
+        }
+      }
+      const expl = trimExplanation(entry.explanation || entry.evidence || '');
+      const vis =
+        entry.visibility && ['visible', 'partial', 'unavailable'].includes(entry.visibility)
+          ? entry.visibility
+          : dt
+          ? 'visible'
+          : 'unavailable';
+      const conf =
+        entry.confidence && ['high', 'medium', 'estimated'].includes(entry.confidence)
+          ? entry.confidence
+          : 'high';
+      return {
+        ...entry,
+        detectedText: dt,
+        explanation: expl,
+        visibility: vis,
+        confidence: conf,
+      };
+    }
+    return null;
+  };
+
   if (rawAnalysis.leadSentence) {
     rawAnalysis.leadSentence = cleanText(rawAnalysis.leadSentence);
   }
   if (!rawAnalysis.styleCategory) {
     rawAnalysis.styleCategory = 'photorealistic';
   }
-
-  // Ensure outputRatio comes from client if provided
   if (clientOutputRatio && clientOutputRatio.trim()) {
     rawAnalysis.outputRatio = clientOutputRatio.trim();
   }
 
-  // Normalize components
-  if (rawAnalysis.components && typeof rawAnalysis.components === 'object') {
-    for (const k of Object.keys(rawAnalysis.components)) {
-      const comp = rawAnalysis.components[k];
-      if (comp && typeof comp === 'object') {
-        comp.detectedText = cleanText(comp.detectedText);
-        comp.explanation = trimExplanation(comp.explanation);
+  // Subjects list
+  const subjects: Array<{ id: string; label: string; prominence: string }> = Array.isArray(
+    rawAnalysis.subjects
+  )
+    ? rawAnalysis.subjects.map((s: any, idx: number) => ({
+        id: String(s?.id || (idx === 0 ? 'A' : idx === 1 ? 'B' : `S${idx + 1}`)),
+        label: String(s?.label || s?.description || `Subject ${idx === 0 ? 'A' : 'B'}`),
+        prominence: s?.prominence === 'secondary' ? 'secondary' : 'primary',
+      }))
+    : [{ id: 'A', label: 'Primary Subject', prominence: 'primary' }];
+  if (subjects.length === 0) {
+    subjects.push({ id: 'A', label: 'Primary Subject', prominence: 'primary' });
+  }
+  rawAnalysis.subjects = subjects;
 
-        if (!comp.visibility || !['visible', 'partial', 'unavailable'].includes(comp.visibility)) {
-          comp.visibility = comp.detectedText ? 'visible' : 'unavailable';
-        }
-        if (!comp.confidence || !['high', 'medium', 'estimated'].includes(comp.confidence)) {
-          comp.confidence = 'high';
-        }
+  const sharedComponents: Record<string, any> = {};
+  const personComponents: Record<string, Record<string, any>> = {};
+  for (const s of subjects) {
+    personComponents[s.id] = {};
+  }
 
-        // Camera specific sanity check: NEVER default to eye-level if elevation is below seat/floor/low
-        if (k === 'camera' && comp.detectedText) {
-          const lower = comp.detectedText.toLowerCase();
-          if (
-            (lower.includes('floor-level') ||
-              lower.includes('below seat') ||
-              lower.includes('near floor') ||
-              lower.includes('low-angle')) &&
-            lower.includes('eye-level')
-          ) {
-            comp.detectedText = comp.detectedText.replace(/\beye-level\b/gi, 'low camera elevation');
-          }
+  const rawShared =
+    rawAnalysis.sharedComponents && typeof rawAnalysis.sharedComponents === 'object'
+      ? rawAnalysis.sharedComponents
+      : {};
+  const rawFlat =
+    rawAnalysis.components && typeof rawAnalysis.components === 'object'
+      ? rawAnalysis.components
+      : {};
+  const rawPersonBuckets =
+    (rawAnalysis.personComponents && typeof rawAnalysis.personComponents === 'object'
+      ? rawAnalysis.personComponents
+      : null) ||
+    (rawAnalysis.subjectComponents && typeof rawAnalysis.subjectComponents === 'object'
+      ? rawAnalysis.subjectComponents
+      : null) ||
+    {};
+
+  // 1. Shared keys
+  for (const key of SERVER_SHARED_KEYS) {
+    const candidate = rawShared[key] ?? rawFlat[key] ?? rawAnalysis[key];
+    const norm = normalizeCompEntry(key, candidate);
+    if (norm) {
+      sharedComponents[key] = norm;
+    }
+  }
+
+  // 2. Person keys per subject
+  for (const subj of subjects) {
+    const sid = subj.id;
+    const subjBucket = rawPersonBuckets[sid] || {};
+    for (const key of SERVER_PERSON_KEYS) {
+      let candidate = subjBucket[key];
+      if (candidate === undefined && rawFlat[key] && typeof rawFlat[key] === 'object') {
+        if (rawFlat[key][sid] !== undefined && rawFlat[key].detectedText === undefined) {
+          candidate = rawFlat[key][sid];
         }
+      }
+      if (candidate === undefined && (subjects.length === 1 || sid === subjects[0].id)) {
+        candidate = rawFlat[key] ?? rawAnalysis[key];
+      }
+      const norm = normalizeCompEntry(key, candidate);
+      if (norm) {
+        personComponents[sid][key] = norm;
       }
     }
   }
 
+  // 3. Build unified flat components as well so both canonical and legacy consumers stay in sync
+  const unifiedComponents: Record<string, any> = {};
+  for (const key of SERVER_SHARED_KEYS) {
+    if (sharedComponents[key]) {
+      unifiedComponents[key] = sharedComponents[key];
+    }
+  }
+  for (const key of SERVER_PERSON_KEYS) {
+    const perSubjEntries = subjects
+      .map((s) => ({ subj: s, comp: personComponents[s.id]?.[key] }))
+      .filter((item) => item.comp && item.comp.detectedText);
+
+    if (perSubjEntries.length === 1) {
+      unifiedComponents[key] = perSubjEntries[0].comp;
+    } else if (perSubjEntries.length > 1) {
+      const mergedText = perSubjEntries
+        .map(({ subj, comp }) => `Subject ${subj.id} (${subj.label}): ${comp.detectedText}`)
+        .join(' ');
+      unifiedComponents[key] = {
+        detectedText: mergedText,
+        explanation: perSubjEntries[0].comp.explanation || 'Multi-subject observation',
+        visibility: 'visible',
+        confidence: perSubjEntries[0].comp.confidence || 'high',
+      };
+    } else if (rawFlat[key]) {
+      const norm = normalizeCompEntry(key, rawFlat[key]);
+      if (norm) unifiedComponents[key] = norm;
+    }
+  }
+
+  rawAnalysis.sharedComponents = sharedComponents;
+  rawAnalysis.personComponents = personComponents;
+  rawAnalysis.subjectComponents = personComponents;
+  rawAnalysis.components = unifiedComponents;
+
   return rawAnalysis;
+}
+
+function getMissingCoreKeysFromNormalized(normalized: any): string[] {
+  const comps = normalized?.components || {};
+  const missing: string[] = [];
+  for (const key of SERVER_CORE_13_KEYS) {
+    const c = comps[key];
+    if (!c || !c.detectedText || !String(c.detectedText).trim()) {
+      missing.push(key);
+    }
+  }
+  return missing;
 }
 
 // Resilient model call helper with multi-key support, fast per-model timeout, and bounded total execution time
@@ -598,7 +851,16 @@ async function generateWithFallback(
   parts: any[],
   jsonMode = true,
   customKey?: string
-): Promise<{ text: string; parsed?: any; modelUsed: string; switchedToBackup: boolean }> {
+): Promise<{
+  text: string;
+  parsed?: any;
+  modelUsed: string;
+  switchedToBackup: boolean;
+  finishReason: string;
+  jsonParseSucceeded: boolean;
+  jsonRepaired: boolean;
+  repairNote?: string;
+}> {
   const isQuotaOrRateLimit = (err: any): boolean => {
     const status = err?.status || err?.statusCode || err?.code;
     if (status === 429 || status === '429') return true;
@@ -627,13 +889,13 @@ async function generateWithFallback(
     timeoutMs: number;
     thinkingLevel?: ThinkingLevel;
   }> = [
-    { name: 'gemini-3.8-flash', timeoutMs: 18000, thinkingLevel: ThinkingLevel.LOW },
-    { name: 'gemini-3.1-flash-lite', timeoutMs: 18000, thinkingLevel: ThinkingLevel.LOW },
-    { name: 'gemini-flash-latest', timeoutMs: 18000 },
+    { name: 'gemini-3.8-flash', timeoutMs: 22000, thinkingLevel: ThinkingLevel.LOW },
+    { name: 'gemini-3.1-flash-lite', timeoutMs: 20000, thinkingLevel: ThinkingLevel.LOW },
+    { name: 'gemini-flash-latest', timeoutMs: 20000 },
   ];
 
   const startTime = Date.now();
-  const MAX_TOTAL_BUDGET_MS = 38000;
+  const MAX_TOTAL_BUDGET_MS = 42000;
 
   let lastError: any = null;
   let modelUsed = fallbackModels[0].name;
@@ -657,6 +919,7 @@ async function generateWithFallback(
       try {
         const config: Record<string, any> = {
           temperature: 0.2,
+          maxOutputTokens: 8192,
         };
         if (modelConfig.thinkingLevel !== undefined) {
           config.thinkingConfig = { thinkingLevel: modelConfig.thinkingLevel };
@@ -676,17 +939,34 @@ async function generateWithFallback(
           modelConfig.name
         );
 
+        const finishReason = String(response.candidates?.[0]?.finishReason || 'STOP');
         const txt = (response.text || '').trim();
         if (!txt) {
           throw new Error('Empty response from model');
         }
 
         if (jsonMode) {
-          const parsed = parseModelJson(txt);
-          return { text: txt, parsed, modelUsed, switchedToBackup };
+          const meta = parseModelJsonWithMeta(txt);
+          return {
+            text: txt,
+            parsed: meta.parsed,
+            modelUsed,
+            switchedToBackup,
+            finishReason,
+            jsonParseSucceeded: meta.jsonParseSucceeded,
+            jsonRepaired: meta.jsonRepaired,
+            repairNote: meta.repairNote,
+          };
         }
 
-        return { text: txt, modelUsed, switchedToBackup };
+        return {
+          text: txt,
+          modelUsed,
+          switchedToBackup,
+          finishReason,
+          jsonParseSucceeded: true,
+          jsonRepaired: false,
+        };
       } catch (err: any) {
         lastError = err;
         const errMsg = formatServerErrorMessage(err, '');
@@ -711,6 +991,116 @@ async function generateWithFallback(
   }
 
   throw lastError || new Error('No response returned from Gemini analysis.');
+}
+
+// Targeted server-side repair for missing components when response was truncated or < 60% present
+async function repairMissingComponentsOnServer(
+  ai: GoogleGenAI,
+  imagePart: any,
+  normalizedAnalysis: any,
+  missingKeys: string[],
+  customKey?: string,
+  soloSubjectLabel?: string
+): Promise<{ repairedKeys: string[]; updatedAnalysis: any }> {
+  if (!missingKeys || missingKeys.length === 0) {
+    return { repairedKeys: [], updatedAnalysis: normalizedAnalysis };
+  }
+
+  const subjects = Array.isArray(normalizedAnalysis?.subjects)
+    ? normalizedAnalysis.subjects
+    : [{ id: 'A', label: 'Primary Subject', prominence: 'primary' }];
+
+  const isMulti = !soloSubjectLabel && subjects.length >= 2;
+  const missingShared = missingKeys.filter((k) => (SERVER_SHARED_KEYS as readonly string[]).includes(k));
+  const missingPerson = missingKeys.filter((k) => (SERVER_PERSON_KEYS as readonly string[]).includes(k));
+
+  const repairPrompt = `You are a high-precision photographic visual analysis engine for My Whisk AI.
+Complete ONLY the missing visual components listed below for the uploaded image.
+${soloSubjectLabel ? `IMPORTANT: Describe ONLY ${soloSubjectLabel} as if no other person exists in the frame.` : ''}
+Rules: 1 to 3 concrete present-tense sentences per detectedText. No hedging ("or", "/", "appears", "seems", "possibly"). Explanation max 15 words.
+
+Missing component keys to extract: ${missingKeys.join(', ')}
+
+Return VALID, PURE JSON matching this exact structure:
+{
+  "sharedComponents": {
+    ${missingShared.map((k) => `"${k}": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }`).join(',\n    ')}
+  },
+  "personComponents": {
+    ${subjects
+      .map(
+        (s: any) =>
+          `"${s.id}": {\n      ${missingPerson
+            .map((k) => `"${k}": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }`)
+            .join(',\n      ')}\n    }`
+      )
+      .join(',\n    ')}
+  },
+  "components": {
+    ${missingKeys.map((k) => `"${k}": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }`).join(',\n    ')}
+  }
+}`;
+
+  try {
+    const parts = [{ text: repairPrompt }, imagePart];
+    const repairRes = await generateWithFallback(ai, parts, true, customKey);
+    const repairParsed = repairRes.parsed || parseModelJson(repairRes.text);
+    const repairedKeys: string[] = [];
+
+    if (repairParsed && typeof repairParsed === 'object') {
+      const rShared = repairParsed.sharedComponents || repairParsed.components || {};
+      const rPerson = repairParsed.personComponents || repairParsed.subjectComponents || {};
+      const rFlat = repairParsed.components || {};
+
+      for (const k of missingShared) {
+        const entry = rShared[k] ?? rFlat[k] ?? repairParsed[k];
+        if (entry && (entry.detectedText || typeof entry === 'string')) {
+          normalizedAnalysis.sharedComponents = normalizedAnalysis.sharedComponents || {};
+          normalizedAnalysis.sharedComponents[k] = entry;
+          normalizedAnalysis.components = normalizedAnalysis.components || {};
+          normalizedAnalysis.components[k] = entry;
+          repairedKeys.push(k);
+        }
+      }
+
+      for (const k of missingPerson) {
+        let anySubjFilled = false;
+        for (const s of subjects) {
+          const sid = s.id;
+          const entry = rPerson?.[sid]?.[k] ?? (!isMulti ? rFlat[k] ?? repairParsed[k] : undefined);
+          if (entry && (entry.detectedText || typeof entry === 'string')) {
+            normalizedAnalysis.personComponents = normalizedAnalysis.personComponents || {};
+            normalizedAnalysis.personComponents[sid] = normalizedAnalysis.personComponents[sid] || {};
+            normalizedAnalysis.personComponents[sid][k] = entry;
+            anySubjFilled = true;
+          }
+        }
+        if (!anySubjFilled && (rFlat[k] || repairParsed[k])) {
+          const entry = rFlat[k] ?? repairParsed[k];
+          if (entry && (entry.detectedText || typeof entry === 'string')) {
+            const firstId = subjects[0]?.id || 'A';
+            normalizedAnalysis.personComponents = normalizedAnalysis.personComponents || {};
+            normalizedAnalysis.personComponents[firstId] = normalizedAnalysis.personComponents[firstId] || {};
+            normalizedAnalysis.personComponents[firstId][k] = entry;
+            anySubjFilled = true;
+          }
+        }
+        if (anySubjFilled) {
+          repairedKeys.push(k);
+        }
+      }
+
+      normalizedAnalysis = normalizeScanAnalysis(
+        normalizedAnalysis,
+        normalizedAnalysis.outputRatio
+      );
+    }
+
+    return { repairedKeys, updatedAnalysis: normalizedAnalysis };
+  } catch (err) {
+    console.warn('Targeted repair call failed:', err);
+    return { repairedKeys: [], updatedAnalysis: normalizedAnalysis };
+  }
 }
 
 // Health check endpoint
@@ -738,10 +1128,12 @@ app.post('/api/analyze-reference', async (req, res) => {
 
 Analyze the uploaded image in complete detail according to these STRICT RULES:
 
-1. MULTI-SUBJECT DETECTION:
+1. MULTI-SUBJECT DETECTION & CANONICAL BUCKETS:
 - Count real people clearly part of the main composition in "subjects": [{ "id": "A", "label": "short description + position in frame", "prominence": "primary|secondary" }].
 - Exclude reflections, posters, statues, and tiny far-away background passers-by.
-- If 2 or more real subjects are present, include a scene-level "interaction" component describing contact points, relative positions, who is in front, gaze between them, and height difference. Also include "subjectComponents": { "A": { ...person components... }, "B": { ...person components... } }.
+- Store shared scene components in "sharedComponents" (camera, framing, lighting, background, environment, composition, and "interaction" when 2+ subjects exist).
+- Store per-person components in "personComponents": { "A": { subject, body, pose, clothing, facial_expression, hand_gestures, leg_gestures }, "B": { ... } }. For 1 subject, populate "personComponents": { "A": { ... } }.
+- Also populate flat "components" with all 13 keys so every consumer receives a complete unified structure.
 
 2. DETECTED TEXT SPECIFICATION (1 to 3 CONCRETE PRESENT-TENSE SENTENCES, up to 4 for subject, clothing, background):
 - Every "detectedText" MUST contain the full prompt-ready description. Detail lives ONLY in "detectedText", never solely in "explanation".
@@ -766,13 +1158,13 @@ Analyze the uploaded image in complete detail according to these STRICT RULES:
 - Short evidence note, MAXIMUM 15 WORDS (e.g. "Floor fills lower quarter, bed side visible, no mattress top").
 
 5. LEAD SENTENCE & SUMMARY:
-- Provide "leadSentence": a clean prompt-starter sentence describing the main subject, pose, and setting (e.g., "A young woman sits on the edge of a low platform bed in a bright, modern bedroom.").
+- Provide "leadSentence": a clean prompt-starter sentence describing the main subject(s), pose, and setting.
 - Set "styleCategory": "photorealistic" | "illustration" | "3D" | "painting".
 - Write "summary" LAST so it never contradicts any field.
 
 ${userNotes?.trim() ? `Additional user notes:\n${userNotes.trim()}\n` : ''}
 
-Return VALID, PURE JSON matching this schema:
+Return VALID, PURE JSON matching this unified canonical schema:
 {
   "leadSentence": "A young woman sits on the edge of a low platform bed in a bright, modern bedroom.",
   "styleCategory": "photorealistic",
@@ -789,6 +1181,25 @@ Return VALID, PURE JSON matching this schema:
     "framing": "Vertical frame with empty floor in lower quarter",
     "distance": "Medium portrait distance",
     "angleOfView": "Wide-angle perspective with slight upward tilt"
+  },
+  "sharedComponents": {
+    "camera": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "framing": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "lighting": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "background": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "environment": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "composition": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }
+  },
+  "personComponents": {
+    "A": {
+      "subject": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "body": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "pose": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "clothing": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "facial_expression": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "hand_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "leg_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }
+    }
   },
   "components": {
     "subject": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
@@ -807,30 +1218,58 @@ Return VALID, PURE JSON matching this schema:
   }
 }`;
 
-    const parts: any[] = [{ text: analysisPrompt }];
-    for (const img of images.slice(0, 1)) {
-      parts.push({
-        inlineData: {
-          mimeType: img.mimeType || 'image/jpeg',
-          data: img.data,
-        },
-      });
-    }
+    const imagePart = {
+      inlineData: {
+        mimeType: images[0].mimeType || 'image/jpeg',
+        data: images[0].data,
+      },
+    };
+    const parts: any[] = [{ text: analysisPrompt }, imagePart];
 
-    const { text, modelUsed, switchedToBackup } = await generateWithFallback(
-      ai,
-      parts,
-      true,
-      customKey
-    );
-    let parsed = parseModelJson(text);
+    const genRes = await generateWithFallback(ai, parts, true, customKey);
+    let parsed = genRes.parsed || parseModelJson(genRes.text);
     parsed = normalizeScanAnalysis(parsed, clientRatio);
+
+    const missingBeforeRepair = getMissingCoreKeysFromNormalized(parsed);
+    const presentRatio = (13 - missingBeforeRepair.length) / 13;
+    const needsServerRepair =
+      (genRes.finishReason === 'MAX_TOKENS' || genRes.jsonRepaired || presentRatio < 0.6) &&
+      missingBeforeRepair.length > 0;
+
+    let truncationRepairTriggered = false;
+    let repairedKeys: string[] = [];
+
+    if (needsServerRepair) {
+      truncationRepairTriggered = true;
+      const repairOut = await repairMissingComponentsOnServer(
+        ai,
+        imagePart,
+        parsed,
+        missingBeforeRepair,
+        customKey
+      );
+      parsed = repairOut.updatedAnalysis;
+      repairedKeys = repairOut.repairedKeys;
+    }
 
     res.json({
       success: true,
       analysis: parsed,
-      modelUsed,
-      switchedToBackup,
+      modelUsed: genRes.modelUsed,
+      switchedToBackup: genRes.switchedToBackup,
+      debugMeta: {
+        httpStatus: 200,
+        modelUsed: genRes.modelUsed,
+        quotaFallback: false,
+        responseLength: genRes.text.length,
+        finishReason: genRes.finishReason,
+        jsonParseSucceeded: genRes.jsonParseSucceeded,
+        jsonRepaired: genRes.jsonRepaired,
+        repairNote: genRes.repairNote,
+        truncationRepairTriggered,
+        repairedKeys,
+        rawTextPreview: genRes.text.slice(0, 1500),
+      },
     });
   } catch (error: any) {
     const msg = formatServerErrorMessage(error, 'Failed to analyze reference image.');
@@ -838,7 +1277,11 @@ Return VALID, PURE JSON matching this schema:
 
     if (isQuotaOrServiceUnavailable(error)) {
       const firstImg = req.body?.images?.[0]?.data;
-      const fallbackAnalysis = buildReferenceQuotaFallbackAnalysis(firstImg, req.body?.userNotes);
+      const fallbackAnalysis = normalizeScanAnalysis(
+        buildReferenceQuotaFallbackAnalysis(firstImg, req.body?.userNotes),
+        req.body?.outputRatio
+      );
+      const rawFallbackStr = JSON.stringify(fallbackAnalysis);
       return res.status(200).json({
         success: true,
         analysis: fallbackAnalysis,
@@ -846,6 +1289,18 @@ Return VALID, PURE JSON matching this schema:
         switchedToBackup: true,
         quotaFallback: true,
         warning: 'Estimated blueprint, not an AI analysis',
+        debugMeta: {
+          httpStatus: 200,
+          modelUsed: 'local-geometry-blueprint',
+          quotaFallback: true,
+          responseLength: rawFallbackStr.length,
+          finishReason: 'QUOTA_FALLBACK',
+          jsonParseSucceeded: true,
+          jsonRepaired: false,
+          truncationRepairTriggered: false,
+          repairedKeys: [],
+          rawTextPreview: rawFallbackStr.slice(0, 1500),
+        },
       });
     }
 
@@ -878,47 +1333,182 @@ app.post('/api/reanalyze-solo', async (req, res) => {
 The user wishes to analyze ${subjName} ONLY and COMPLETELY IGNORE all other people in the image.
 
 RE-ANALYSIS MANDATE:
-1. Re-describe pose, body, hand_gestures, leg_gestures, facial_expression, clothing, framing, camera, lighting, environment, background, and composition as if ${subjName} is the ONLY person in the scene.
+1. Re-describe subject, body, pose, hand_gestures, leg_gestures, facial_expression, clothing, framing, camera, lighting, environment, background, and composition as if ${subjName} is the ONLY person in the scene.
 2. If ${subjName} has gestures or physical contact directed at an ignored person, phrase it as directed toward empty space (e.g. "right hand extended forward in a relaxed gesture toward empty space").
-3. Remove EVERY mention of any ignored person, "both", "two", "the subjects", "the couple", or second person from ALL fields.
-4. Set leadSentence to a rich, specific description of ${subjName} and setting only (e.g. "A woman in her late 20s with long brown hair, leaning forward on a sofa in a bright residential living room."). DO NOT include "No other person is present in the frame" in leadSentence.
+3. Remove EVERY mention of any ignored person, "both", "two", "the subjects", "the couple", "each other", or a second person from ALL fields.
+4. Set leadSentence to a rich, specific description of ${subjName} and setting only (e.g. "A woman in her late 20s with long brown hair sits on a sofa in a bright residential living room."). DO NOT include "No other person is present in the frame" in leadSentence.
 5. Ensure ENVIRONMENT is described independently as its own atmospheric/setting context.
-6. Follow all standard rules: 1-3 concrete present-tense sentences for detectedText, no hedging ("or", "/", "appears", "seems", "possibly", "approximately", "likely"), evidence max 15 words.
+6. Follow all standard rules: 1-3 concrete present-tense sentences for detectedText, no hedging ("or", "/", "appears", "seems", "possibly", "approximately", "likely"), explanation max 15 words.
 
-Return VALID, PURE JSON matching the single-subject analysis schema.`;
+Return VALID, PURE JSON matching this exact canonical schema:
+{
+  "leadSentence": "...",
+  "styleCategory": "photorealistic",
+  "summary": "...",
+  "outputRatio": "${outputRatio || '3:4'}",
+  "subjects": [
+    { "id": "${targetId}", "label": "${subjName.replace(/"/g, '\\"')}", "prominence": "primary" }
+  ],
+  "sharedComponents": {
+    "camera": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "framing": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "lighting": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "background": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "environment": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "composition": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }
+  },
+  "personComponents": {
+    "${targetId}": {
+      "subject": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "body": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "pose": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "clothing": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "facial_expression": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "hand_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+      "leg_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }
+    }
+  },
+  "components": {
+    "subject": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "body": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "pose": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "camera": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "framing": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "clothing": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "lighting": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "background": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "environment": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "composition": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "facial_expression": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "hand_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "leg_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }
+  }
+}`;
 
-    const parts = [
-      { text: soloPrompt },
-      { inlineData: { mimeType: image.mimeType || 'image/jpeg', data: image.data } },
-    ];
+    const imagePart = {
+      inlineData: { mimeType: image.mimeType || 'image/jpeg', data: image.data },
+    };
+    const parts = [{ text: soloPrompt }, imagePart];
 
-    const { text, modelUsed, switchedToBackup } = await generateWithFallback(
-      ai,
-      parts,
-      true,
-      customKey
-    );
-    let parsed = parseModelJson(text);
+    const genRes = await generateWithFallback(ai, parts, true, customKey);
+    let parsed = genRes.parsed || parseModelJson(genRes.text);
     parsed = normalizeScanAnalysis(parsed, outputRatio);
+
+    const missingBeforeRepair = getMissingCoreKeysFromNormalized(parsed);
+    const presentRatio = (13 - missingBeforeRepair.length) / 13;
+    const needsServerRepair =
+      (genRes.finishReason === 'MAX_TOKENS' || genRes.jsonRepaired || presentRatio < 0.6) &&
+      missingBeforeRepair.length > 0;
+
+    let truncationRepairTriggered = false;
+    let repairedKeys: string[] = [];
+
+    if (needsServerRepair) {
+      truncationRepairTriggered = true;
+      const repairOut = await repairMissingComponentsOnServer(
+        ai,
+        imagePart,
+        parsed,
+        missingBeforeRepair,
+        customKey,
+        subjName
+      );
+      parsed = repairOut.updatedAnalysis;
+      repairedKeys = repairOut.repairedKeys;
+    }
 
     res.json({
       success: true,
       analysis: parsed,
-      modelUsed,
-      switchedToBackup,
+      modelUsed: genRes.modelUsed,
+      switchedToBackup: genRes.switchedToBackup,
+      debugMeta: {
+        httpStatus: 200,
+        modelUsed: genRes.modelUsed,
+        quotaFallback: false,
+        responseLength: genRes.text.length,
+        finishReason: genRes.finishReason,
+        jsonParseSucceeded: genRes.jsonParseSucceeded,
+        jsonRepaired: genRes.jsonRepaired,
+        repairNote: genRes.repairNote,
+        truncationRepairTriggered,
+        repairedKeys,
+        rawTextPreview: genRes.text.slice(0, 1500),
+      },
     });
   } catch (error: any) {
     const msg = formatServerErrorMessage(error, 'Failed to reanalyze solo subject.');
     console.warn('Solo reanalysis fallback:', msg);
 
-    const fallback = buildReferenceQuotaFallbackAnalysis(req.body?.image?.data);
-    fallback.leadSentence = 'A woman in her late 20s, sitting in a bright room.';
+    const fallback = normalizeScanAnalysis(
+      buildReferenceQuotaFallbackAnalysis(req.body?.image?.data),
+      req.body?.outputRatio
+    );
+    fallback.leadSentence = 'A single subject positioned in the analyzed scene.';
+    const rawFallbackStr = JSON.stringify(fallback);
     res.status(200).json({
       success: true,
       analysis: fallback,
       quotaFallback: true,
       warning: 'Local solo subject fallback used. Please review scene fields.',
+      debugMeta: {
+        httpStatus: 200,
+        modelUsed: 'local-geometry-blueprint',
+        quotaFallback: true,
+        responseLength: rawFallbackStr.length,
+        finishReason: 'QUOTA_FALLBACK',
+        jsonParseSucceeded: true,
+        jsonRepaired: false,
+        truncationRepairTriggered: false,
+        repairedKeys: [],
+        rawTextPreview: rawFallbackStr.slice(0, 1500),
+      },
     });
+  }
+});
+
+// Endpoint: Targeted Missing Component Repair (when client detects < 60% components or truncation)
+app.post('/api/repair-components', async (req, res) => {
+  try {
+    const { image, missingKeys, subjects, soloSubjectLabel, outputRatio } = req.body;
+    const customKey = req.headers['x-gemini-key'] as string | undefined;
+
+    if (!image || !image.data || !Array.isArray(missingKeys) || missingKeys.length === 0) {
+      return res.status(400).json({ error: 'Image and missingKeys array are required.' });
+    }
+
+    const ai = getGenAIClient(customKey);
+    const imagePart = {
+      inlineData: { mimeType: image.mimeType || 'image/jpeg', data: image.data },
+    };
+
+    const seedAnalysis = {
+      outputRatio: outputRatio || '3:4',
+      subjects: Array.isArray(subjects) && subjects.length > 0
+        ? subjects
+        : [{ id: 'A', label: 'Primary Subject', prominence: 'primary' }],
+      sharedComponents: {},
+      personComponents: {},
+      components: {},
+    };
+
+    const { repairedKeys, updatedAnalysis } = await repairMissingComponentsOnServer(
+      ai,
+      imagePart,
+      seedAnalysis,
+      missingKeys,
+      customKey,
+      soloSubjectLabel
+    );
+
+    res.json({
+      success: true,
+      repairedKeys,
+      analysis: updatedAnalysis,
+    });
+  } catch (error: any) {
+    const msg = formatServerErrorMessage(error, 'Failed to repair missing components.');
+    res.status(500).json({ error: msg });
   }
 });
 

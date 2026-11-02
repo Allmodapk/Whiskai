@@ -1,6 +1,11 @@
 import { checkPromptContradictions } from '../contradictionCheck';
 import { findIgnoredSubjectLeaks } from '../leakGuard';
 import { buildGeneralExtractorPrompt } from '../promptBuilder';
+import {
+  normalizeScanResult,
+  mergeRepairedScanResult,
+  buildSoloFromMultiSnapshot,
+} from '../scanNormalizer';
 import { ComponentKey, DetectedComponent, ALL_COMPONENT_KEYS, SubjectData } from '../../types';
 
 function createDummyComponents(
@@ -227,4 +232,293 @@ console.log('--- Running Scan Quality & Prompt Pipeline Unit Tests ---');
   console.log('✓ Test 9 Passed: Solo phrase deduplication verified.');
 }
 
+// Test 10: Two-person fixtures across all response shapes produce a populated checklist (13/13 visible)
+{
+  const subjectsFixture = [
+    { id: 'A', label: 'Woman leaning forward on sofa', prominence: 'primary' },
+    { id: 'B', label: 'Man seated on frame-right', prominence: 'secondary' },
+  ];
+
+  const makeCompObj = (txt: string) => ({
+    detectedText: txt,
+    explanation: 'Observed in frame',
+    visibility: 'visible',
+    confidence: 'high',
+  });
+
+  // Shape 1: Canonical shape (sharedComponents + personComponents)
+  const shape1Canonical = {
+    analysis: {
+      leadSentence: 'A woman and a man sit on a beige sofa in a living room.',
+      subjects: subjectsFixture,
+      sharedComponents: {
+        camera: makeCompObj('Eye-level medium shot.'),
+        framing: makeCompObj('Three-quarter framing of both subjects.'),
+        lighting: makeCompObj('Soft window light from frame-left.'),
+        background: makeCompObj('Beige sofa and white wall.'),
+        environment: makeCompObj('Bright residential living room.'),
+        composition: makeCompObj('Balanced two-person composition.'),
+        interaction: makeCompObj('Seated side by side on the sofa.'),
+      },
+      personComponents: {
+        A: {
+          subject: makeCompObj('Woman in her late 20s with brown hair.'),
+          body: makeCompObj('Slender build.'),
+          pose: makeCompObj('Leaning forward with hands on knees.'),
+          clothing: makeCompObj('Beige crewneck sweatshirt.'),
+          facial_expression: makeCompObj('Soft smile looking at lens.'),
+          hand_gestures: makeCompObj('Hands resting on knees.'),
+          leg_gestures: makeCompObj('Feet flat on floor.'),
+        },
+        B: {
+          subject: makeCompObj('Man in his early 30s with short dark hair.'),
+          body: makeCompObj('Athletic build.'),
+          pose: makeCompObj('Seated upright against sofa back.'),
+          clothing: makeCompObj('Navy t-shirt and grey pants.'),
+          facial_expression: makeCompObj('Calm expression looking at camera.'),
+          hand_gestures: makeCompObj('Hands folded in lap.'),
+          leg_gestures: makeCompObj('Legs relaxed forward.'),
+        },
+      },
+    },
+  };
+
+  // Shape 2: Split components (shared in components, per-person in subjectComponents - previous server shape!)
+  const shape2Split = {
+    analysis: {
+      subjects: subjectsFixture,
+      components: shape1Canonical.analysis.sharedComponents,
+      subjectComponents: shape1Canonical.analysis.personComponents,
+    },
+  };
+
+  // Shape 3: Old flat shape (all 13 in components)
+  const shape3OldFlat = {
+    analysis: {
+      subjects: subjectsFixture,
+      components: {
+        ...shape1Canonical.analysis.sharedComponents,
+        ...shape1Canonical.analysis.personComponents.A,
+      },
+    },
+  };
+
+  // Shape 4: Key-nested subject map inside components (components.subject.A / B)
+  const shape4KeyNested = {
+    analysis: {
+      subjects: subjectsFixture,
+      components: {
+        ...shape1Canonical.analysis.sharedComponents,
+        subject: {
+          A: makeCompObj('Woman in her late 20s.'),
+          B: makeCompObj('Man in his early 30s.'),
+        },
+        body: {
+          A: makeCompObj('Slender build.'),
+          B: makeCompObj('Athletic build.'),
+        },
+        pose: {
+          A: makeCompObj('Leaning forward.'),
+          B: makeCompObj('Seated upright.'),
+        },
+        clothing: {
+          A: makeCompObj('Beige sweatshirt.'),
+          B: makeCompObj('Navy t-shirt.'),
+        },
+        facial_expression: {
+          A: makeCompObj('Soft smile.'),
+          B: makeCompObj('Calm expression.'),
+        },
+        hand_gestures: {
+          A: makeCompObj('Hands on knees.'),
+          B: makeCompObj('Hands in lap.'),
+        },
+        leg_gestures: {
+          A: makeCompObj('Feet on floor.'),
+          B: makeCompObj('Legs relaxed.'),
+        },
+      },
+    },
+  };
+
+  for (const [idx, fixture] of [shape1Canonical, shape2Split, shape3OldFlat, shape4KeyNested].entries()) {
+    const norm = normalizeScanResult(fixture, { mode: 'all' });
+    assert(
+      norm.visibleCount === 13,
+      `Shape ${idx + 1} expected 13/13 visible components, got ${norm.visibleCount}`
+    );
+    assert(!norm.needsRepair, `Shape ${idx + 1} should not need repair`);
+    const unavailableInChecklist = ALL_COMPONENT_KEYS.filter(
+      (k) => norm.activeComponents[k].state === 'unavailable'
+    );
+    assert(
+      unavailableInChecklist.length === 0,
+      `Shape ${idx + 1} should have 0 unavailable checklist items, got ${unavailableInChecklist.length}`
+    );
+  }
+  console.log('✓ Test 10 Passed: Two-person fixtures in all 4 response shapes produce a populated 13/13 checklist.');
+}
+
+// Test 11: Truncated response triggers repair path and merges repaired components cleanly
+{
+  const truncatedPayload = {
+    analysis: {
+      subjects: [
+        { id: 'A', label: 'Woman on left', prominence: 'primary' },
+        { id: 'B', label: 'Man on right', prominence: 'secondary' },
+      ],
+      sharedComponents: {
+        camera: { detectedText: 'Eye-level medium shot.', visibility: 'visible' },
+        framing: { detectedText: 'Medium framing.', visibility: 'visible' },
+        lighting: { detectedText: 'Natural window light.', visibility: 'visible' },
+      },
+      personComponents: {
+        A: {
+          subject: { detectedText: 'Woman in her 20s.', visibility: 'visible' },
+          body: { detectedText: 'Slender build.', visibility: 'visible' },
+        },
+      },
+    },
+  };
+
+  const initialNorm = normalizeScanResult(truncatedPayload, {
+    mode: 'all',
+    finishReason: 'MAX_TOKENS',
+    jsonRepaired: true,
+  });
+
+  assert(initialNorm.needsRepair === true, 'Expected truncated response to trigger needsRepair=true');
+  assert(
+    initialNorm.missingCoreKeys.includes('background') &&
+      initialNorm.missingCoreKeys.includes('environment') &&
+      initialNorm.missingCoreKeys.includes('clothing'),
+    'Expected missingCoreKeys to list truncated keys'
+  );
+  // Check exact decision reason for missing keys
+  const bgDecision = initialNorm.decisions.find((d) => d.key === 'background');
+  assert(
+    bgDecision?.reason === 'missing from response',
+    `Expected background reason to be "missing from response", got "${bgDecision?.reason}"`
+  );
+
+  // Simulate repair payload for the missing keys
+  const repairResponse = {
+    sharedComponents: {
+      background: { detectedText: 'Cream sofa and wall art.', visibility: 'visible' },
+      environment: { detectedText: 'Bright modern apartment.', visibility: 'visible' },
+      composition: { detectedText: 'Balanced two-subject framing.', visibility: 'visible' },
+    },
+    personComponents: {
+      A: {
+        pose: { detectedText: 'Leaning forward.', visibility: 'visible' },
+        clothing: { detectedText: 'Beige sweater.', visibility: 'visible' },
+        facial_expression: { detectedText: 'Warm smile.', visibility: 'visible' },
+        hand_gestures: { detectedText: 'Hands on knees.', visibility: 'visible' },
+        leg_gestures: { detectedText: 'Seated with knees bent.', visibility: 'visible' },
+      },
+      B: {
+        subject: { detectedText: 'Man in his 30s.', visibility: 'visible' },
+        body: { detectedText: 'Athletic build.', visibility: 'visible' },
+        pose: { detectedText: 'Seated upright.', visibility: 'visible' },
+        clothing: { detectedText: 'Dark shirt.', visibility: 'visible' },
+        facial_expression: { detectedText: 'Neutral expression.', visibility: 'visible' },
+        hand_gestures: { detectedText: 'Arms relaxed.', visibility: 'visible' },
+        leg_gestures: { detectedText: 'Feet on floor.', visibility: 'visible' },
+      },
+    },
+  };
+
+  const merged = mergeRepairedScanResult(initialNorm, repairResponse, { mode: 'all' });
+  assert(merged.visibleCount === 13, `Expected 13/13 visible after repair merge, got ${merged.visibleCount}`);
+  assert(!merged.needsRepair, 'Expected needsRepair=false after repair merge');
+  console.log('✓ Test 11 Passed: Truncated response triggers repair path and merges missing keys to 13/13.');
+}
+
+// Test 12: Simulated empty solo response falls back to stored multi-subject result with needsSoloRewrite flags
+{
+  const multiFixture = normalizeScanResult(
+    {
+      analysis: {
+        subjects: [
+          { id: 'A', label: 'Woman on sofa', prominence: 'primary' },
+          { id: 'B', label: 'Man seated on right', prominence: 'secondary' },
+        ],
+        sharedComponents: {
+          camera: { detectedText: 'Eye-level medium shot.', visibility: 'visible' },
+          framing: { detectedText: 'Three-quarter framing of both people.', visibility: 'visible' },
+          lighting: { detectedText: 'Soft daylight.', visibility: 'visible' },
+          background: { detectedText: 'Living room wall behind the subjects.', visibility: 'visible' },
+          environment: { detectedText: 'Warm residential living room.', visibility: 'visible' },
+          composition: { detectedText: 'Draws the eye toward the man on the right.', visibility: 'visible' },
+        },
+        personComponents: {
+          A: {
+            subject: { detectedText: 'Woman in her late 20s.', visibility: 'visible' },
+            body: { detectedText: 'Slender build.', visibility: 'visible' },
+            pose: { detectedText: 'Seated on the left cushion.', visibility: 'visible' },
+            clothing: { detectedText: 'Beige sweatshirt.', visibility: 'visible' },
+            facial_expression: { detectedText: 'Calm gaze at camera.', visibility: 'visible' },
+            hand_gestures: { detectedText: 'Hands on lap.', visibility: 'visible' },
+            leg_gestures: { detectedText: 'Feet flat on rug.', visibility: 'visible' },
+          },
+          B: {
+            subject: { detectedText: 'Man in his 30s.', visibility: 'visible' },
+            body: { detectedText: 'Tall build.', visibility: 'visible' },
+            pose: { detectedText: 'Leaning back.', visibility: 'visible' },
+            clothing: { detectedText: 'Blue shirt.', visibility: 'visible' },
+            facial_expression: { detectedText: 'Smiling.', visibility: 'visible' },
+            hand_gestures: { detectedText: 'Arms crossed.', visibility: 'visible' },
+            leg_gestures: { detectedText: 'Legs crossed.', visibility: 'visible' },
+          },
+        },
+      },
+    },
+    { mode: 'all' }
+  );
+
+  // Simulate empty solo response from /api/reanalyze-solo
+  const emptySoloNorm = normalizeScanResult({ analysis: {} }, { mode: 'solo', keepIds: ['A'] });
+  assert(emptySoloNorm.visibleCount === 0, 'Expected empty solo response to have 0 visible components');
+
+  // Fallback to stored multi-subject snapshot for Subject A
+  const soloFallback = buildSoloFromMultiSnapshot(multiFixture, 'A');
+  assert(
+    soloFallback.canonical.visibleCount === 13,
+    `Expected fallback solo view to preserve all 13 visible components, got ${soloFallback.canonical.visibleCount}`
+  );
+  assert(
+    soloFallback.canonical.activeComponents.subject.detectedText === 'Woman in her late 20s.',
+    'Expected Subject A person component to be preserved'
+  );
+  assert(
+    !soloFallback.canonical.activeComponents.subject.detectedText.includes('Man in his 30s'),
+    'Expected Subject B person component to be excluded'
+  );
+  assert(
+    soloFallback.canonical.activeComponents.framing.needsSoloRewrite === true &&
+      soloFallback.canonical.activeComponents.composition.needsSoloRewrite === true,
+    'Expected plural/ignored-subject scene fields to be flagged with needsSoloRewrite=true'
+  );
+  console.log('✓ Test 12 Passed: Empty solo response falls back to stored multi-subject result with 13/13 components and needsSoloRewrite flags.');
+}
+
+// Test 13: Single-person path is unchanged and normalizes 13/13 components
+{
+  const singleFixture = {
+    analysis: {
+      leadSentence: 'A woman sits on a wooden bed frame in a sunlit bedroom.',
+      styleCategory: 'photorealistic',
+      subjects: [{ id: 'A', label: 'Woman on bed', prominence: 'primary' }],
+      components: createDummyComponents(),
+    },
+  };
+
+  const singleNorm = normalizeScanResult(singleFixture, { mode: 'all' });
+  assert(singleNorm.subjects.length === 1, 'Expected 1 subject in single-person path');
+  assert(singleNorm.visibleCount === 13, 'Expected 13/13 visible components in single-person path');
+  assert(!singleNorm.needsRepair, 'Single-person complete response should not trigger repair');
+  console.log('✓ Test 13 Passed: Single-person path is unchanged (13/13 visible).');
+}
+
 console.log('--- ALL UNIT TESTS PASSED SUCCESSFULLY ---');
+

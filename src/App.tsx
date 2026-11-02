@@ -28,6 +28,14 @@ import {
 } from './services/promptBuilder';
 import { checkPromptContradictions } from './services/contradictionCheck';
 import { findIgnoredSubjectLeaks } from './services/leakGuard';
+import {
+  normalizeScanResult,
+  mergeRepairedScanResult,
+  buildSoloFromMultiSnapshot,
+  formatPlainTextDebugReport,
+  CanonicalScanStructure,
+  ScanDebugReportData,
+} from './services/scanNormalizer';
 import { SubjectData, ContradictionIssue } from './types';
 import { ComponentCard } from './components/ComponentCard';
 import { ScanProgressPanel } from './components/ScanProgressPanel';
@@ -74,6 +82,7 @@ import {
   Square,
   User,
   ListChecks,
+  Bug,
 } from 'lucide-react';
 
 function checkIsCameraRoute(): { isCameraRoute: boolean; mode: 'playboard' | 'extractor' } {
@@ -222,6 +231,25 @@ export default function App() {
   const [scannedModelUsed, setScannedModelUsed] = useState<string>('');
   const [isQuotaFallback, setIsQuotaFallback] = useState<boolean>(false);
   const [quotaFallbackAcknowledged, setQuotaFallbackAcknowledged] = useState<boolean>(false);
+
+  // Canonical Scan & On-Screen Debug state
+  const [canonicalScan, setCanonicalScan] = useState<CanonicalScanStructure | null>(null);
+  const [multiCanonicalSnapshot, setMultiCanonicalSnapshot] =
+    useState<CanonicalScanStructure | null>(null);
+  const [scanDebugReport, setScanDebugReport] = useState<ScanDebugReportData | null>(null);
+  const [isDebugEnabled, setIsDebugEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('mywhisk_scan_debug') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isDebugPanelOpen, setIsDebugPanelOpen] = useState<boolean>(true);
+  const [debugCopyFeedback, setDebugCopyFeedback] = useState<boolean>(false);
+  const [lowVisibilityError, setLowVisibilityError] = useState<{
+    reason: string;
+    visibleCount: number;
+  } | null>(null);
 
   // Multi-Subject state (Phase 2)
   const [detectedSubjects, setDetectedSubjects] = useState<SubjectData[]>([]);
@@ -731,6 +759,61 @@ export default function App() {
     }
   };
 
+  // Toggle Debug Mode
+  const handleToggleDebug = () => {
+    setIsDebugEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('mywhisk_scan_debug', String(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
+
+  // Copy plain-text debug report (never includes API keys)
+  const handleCopyDebugReport = () => {
+    if (!scanDebugReport) return;
+    triggerHaptic();
+    const reportText = formatPlainTextDebugReport(scanDebugReport);
+    navigator.clipboard.writeText(reportText);
+    setDebugCopyFeedback(true);
+    setTimeout(() => setDebugCopyFeedback(false), 2000);
+  };
+
+  // Apply a canonical scan structure into App state
+  const applyCanonicalScanStructure = (
+    canonical: CanonicalScanStructure,
+    storeAsMultiSnapshot = false
+  ) => {
+    setCanonicalScan(canonical);
+    setOriginalComponents({ ...canonical.originalComponents });
+    setComponents({ ...canonical.activeComponents });
+    setDetectedSubjects([...canonical.subjects]);
+    setSubjectComponents(canonical.personComponents);
+    setScanSummary(canonical.summary);
+    setOutputRatio(canonical.outputRatio || outputRatio || '3:4');
+    setRatioExplanation(canonical.ratioExplanation || '');
+    setScannedLeadSentence(canonical.leadSentence || '');
+    setScannedStyleCategory(canonical.styleCategory || 'photorealistic');
+
+    const visibleKeys = ALL_COMPONENT_KEYS.filter(
+      (k) => canonical.activeComponents[k]?.state !== 'unavailable'
+    );
+    setTickedComponentKeys(visibleKeys.length > 0 ? visibleKeys : [...ALL_COMPONENT_KEYS]);
+
+    if (storeAsMultiSnapshot || canonical.subjects.length >= 2) {
+      setMultiCanonicalSnapshot(canonical);
+      setMultiSubjectSnapshot({
+        components: { ...canonical.activeComponents },
+        originalComponents: { ...canonical.originalComponents },
+        subjects: [...canonical.subjects],
+        subjectComponents: canonical.personComponents,
+      });
+    }
+  };
+
   // Execute 13-Component Grounded Image Analysis
   const handleScanReference = async () => {
     if (!referenceImage) {
@@ -741,7 +824,9 @@ export default function App() {
     triggerHaptic();
     setIsScanning(true);
     setScanError(null);
+    setLowVisibilityError(null);
     setFallbackNotice(null);
+    setSoloRewriteWarning(null);
     setScanStageIndex(0);
 
     const timer = setInterval(() => {
@@ -767,39 +852,71 @@ export default function App() {
 
       const data = await postApiJson<any>('/api/analyze-reference', payload, {
         customKey,
-        timeoutMs: 50000,
+        timeoutMs: 55000,
         maxRetries: 1,
       });
 
       clearInterval(timer);
       setScanStageIndex(9);
-      setFallbackNotice(typeof data.warning === 'string' && data.warning.trim() ? data.warning : null);
+      setFallbackNotice(
+        typeof data.warning === 'string' && data.warning.trim() ? data.warning : null
+      );
 
-      const analysis = data.analysis || {};
-      setScanSummary(analysis.summary || 'Reference analyzed into 13 grounded visual components.');
-      const finalRatio = data.outputRatio || analysis.outputRatio || outputRatio || '3:4';
-      setOutputRatio(finalRatio);
-      setRatioExplanation(analysis.ratioExplanation || '');
-      setScannedLeadSentence(data.leadSentence || analysis.leadSentence || '');
-      setScannedStyleCategory(data.styleCategory || analysis.styleCategory || 'photorealistic');
-      setScannedModelUsed(data.modelUsed || '');
-
-      const quotaFallback = Boolean(data.isQuotaFallback);
+      const debugMeta = data.debugMeta || {};
+      const quotaFallback = Boolean(data.isQuotaFallback || data.quotaFallback || debugMeta.quotaFallback);
       setIsQuotaFallback(quotaFallback);
       if (quotaFallback) {
         setQuotaFallbackAcknowledged(false);
       }
+      setScannedModelUsed(data.modelUsed || debugMeta.modelUsed || '');
 
-      // Populate detected subjects (Phase 2)
-      const subjects: SubjectData[] = data.subjects || analysis.subjects || [];
-      setDetectedSubjects(subjects);
-      setSubjectComponents(data.subjectComponents || null);
-      setActiveSubjectDecision('all');
-      setSelectedSubjectIds(subjects.map((s) => s.id));
+      let canonical = normalizeScanResult(data, {
+        mode: 'all',
+        fallbackRatio: outputRatio || '3:4',
+        finishReason: debugMeta.finishReason,
+        jsonRepaired: debugMeta.jsonRepaired,
+        activeTool,
+        activeProfile,
+      });
+
+      let truncationRepairTriggered = Boolean(debugMeta.truncationRepairTriggered);
+      let repairedKeys: string[] = Array.isArray(debugMeta.repairedKeys)
+        ? [...debugMeta.repairedKeys]
+        : [];
+
+      // Client-side targeted repair safety net if < 60% present or truncated and missing keys remain
+      if (canonical.needsRepair && canonical.missingCoreKeys.length > 0 && !quotaFallback) {
+        truncationRepairTriggered = true;
+        try {
+          const repairRes = await postApiJson<any>(
+            '/api/repair-components',
+            {
+              image: { data: referenceImage.data, mimeType: referenceImage.mimeType },
+              missingKeys: canonical.missingCoreKeys,
+              subjects: canonical.subjects,
+              outputRatio: canonical.outputRatio,
+            },
+            { customKey, timeoutMs: 35000, maxRetries: 0 }
+          );
+          if (repairRes && repairRes.analysis) {
+            canonical = mergeRepairedScanResult(canonical, repairRes.analysis, {
+              mode: 'all',
+              fallbackRatio: canonical.outputRatio,
+              activeTool,
+              activeProfile,
+            });
+            if (Array.isArray(repairRes.repairedKeys)) {
+              repairedKeys = Array.from(new Set([...repairedKeys, ...repairRes.repairedKeys]));
+            }
+          }
+        } catch (repairErr) {
+          console.warn('Client targeted repair call warning:', repairErr);
+        }
+      }
 
       // Populate Camera Angle Controller initial estimates from the analyzed image
-      const est = analysis.cameraEstimates || {};
-      const framingDetected = analysis.components?.framing?.detectedText || '';
+      const est = canonical.cameraEstimates || {};
+      const framingDetected = canonical.sharedComponents.framing?.detectedText || '';
       setCameraSettings({
         viewpoint: est.viewpoint || 'Front-facing view',
         elevation: est.elevation || 'Eye-level camera',
@@ -812,62 +929,34 @@ export default function App() {
         customNotes: '',
       });
 
-      // Build all 13 components grounded strictly in the actual image
-      const originalSnap: Record<ComponentKey, DetectedComponent> = {} as any;
-      const workingComps: Record<ComponentKey, DetectedComponent> = {} as any;
+      setActiveSubjectDecision('all');
+      setSelectedSubjectIds(canonical.subjects.map((s) => s.id));
+      applyCanonicalScanStructure(canonical, true);
 
-      for (const key of ALL_COMPONENT_KEYS) {
-        const item = analysis.components?.[key];
-        const visibility: 'visible' | 'partial' | 'unavailable' =
-          item?.visibility === 'unavailable' ||
-          (!item?.detectedText?.trim() && item?.visibility !== 'visible')
-            ? 'unavailable'
-            : item?.visibility === 'partial'
-            ? 'partial'
-            : 'visible';
+      // Build On-Screen Scan Debug Report
+      const rawPreview =
+        typeof debugMeta.rawTextPreview === 'string'
+          ? debugMeta.rawTextPreview.slice(0, 1500)
+          : JSON.stringify(data.analysis || data).slice(0, 1500);
 
-        const detectedText = visibility === 'unavailable' ? '' : (item?.detectedText || '').trim();
-        const initialState: ComponentState =
-          visibility === 'unavailable' ? 'unavailable' : 'locked';
-
-        const baseComp: DetectedComponent = {
-          key,
-          label: COMPONENT_LABELS[key],
-          detectedText,
-          userText: '',
-          state: initialState,
-          source: 'reference',
-          explanation: item?.explanation || '',
-          visibility,
-        };
-
-        originalSnap[key] = { ...baseComp };
-
-        if (activeTool === 'subject_swapping' && (key === 'subject' || key === 'body')) {
-          workingComps[key] = {
-            ...baseComp,
-            userText: key === 'subject' ? activeProfile.masterSubject : activeProfile.masterBody,
-            state: 'edited',
-            source: 'saved_profile',
-            selectedProfileId: activeProfile.id,
-            selectedProfileName: activeProfile.name,
-          };
-        } else {
-          workingComps[key] = { ...baseComp };
-        }
-      }
-
-      setOriginalComponents(originalSnap);
-      setComponents(workingComps);
-
-      if (subjects.length >= 2) {
-        setMultiSubjectSnapshot({
-          components: { ...workingComps },
-          originalComponents: { ...originalSnap },
-          subjects: [...subjects],
-          subjectComponents: data.subjectComponents || null,
-        });
-      }
+      setScanDebugReport({
+        timestamp: new Date().toISOString(),
+        httpStatus: debugMeta.httpStatus || 200,
+        modelUsed: data.modelUsed || debugMeta.modelUsed || 'gemini-3.8-flash',
+        quotaFallback,
+        responseLength: debugMeta.responseLength || rawPreview.length,
+        finishReason: debugMeta.finishReason || 'STOP',
+        jsonParseSucceeded: debugMeta.jsonParseSucceeded !== false,
+        jsonRepaired: Boolean(debugMeta.jsonRepaired),
+        repairNote: debugMeta.repairNote,
+        truncationRepairTriggered,
+        repairedKeys,
+        topLevelKeys: canonical.topLevelKeys,
+        subjects: canonical.subjects,
+        bucketKeysFound: canonical.bucketKeysFound,
+        decisions: canonical.decisions,
+        rawModelTextPreview: rawPreview,
+      });
 
       setGeneratedMasterPrompt(null);
       setGeneratedNegativePrompt('');
@@ -878,8 +967,21 @@ export default function App() {
           : `Analysis ${new Date().toLocaleDateString()}`
       );
 
-      // Open Multi-subject modal or Checklist drawer
-      if (subjects.length >= 2) {
+      // Fix 4: If fewer than 3 components are visible after repair, show clear error card instead of empty checklist
+      if (canonical.visibleCount < 3) {
+        const missingCount = canonical.decisions.filter(
+          (d) => d.key !== 'interaction' && d.reason === 'missing from response'
+        ).length;
+        const emptyCount = canonical.decisions.filter(
+          (d) => d.key !== 'interaction' && d.reason === 'empty detectedText'
+        ).length;
+        setLowVisibilityError({
+          visibleCount: canonical.visibleCount,
+          reason: `Only ${canonical.visibleCount}/13 components were visible (${missingCount} missing from response, ${emptyCount} empty detectedText, finishReason: ${debugMeta.finishReason || 'STOP'}).`,
+        });
+        setIsMultiSubjectModalOpen(false);
+        setIsChecklistStepOpen(false);
+      } else if (canonical.subjects.length >= 2) {
         setIsMultiSubjectModalOpen(true);
       } else {
         setIsChecklistStepOpen(true);
@@ -896,6 +998,24 @@ export default function App() {
 
   // Phase 2: Multi-subject decision handlers
   const handleConsiderAllSubjects = () => {
+    setLowVisibilityError(null);
+    if (multiCanonicalSnapshot) {
+      applyCanonicalScanStructure(multiCanonicalSnapshot, false);
+      setActiveSubjectDecision('all');
+      setSelectedSubjectIds(multiCanonicalSnapshot.subjects.map((s) => s.id));
+      setIsMultiSubjectModalOpen(false);
+      setSoloRewriteWarning(null);
+      if (multiCanonicalSnapshot.visibleCount < 3) {
+        setLowVisibilityError({
+          visibleCount: multiCanonicalSnapshot.visibleCount,
+          reason: `Only ${multiCanonicalSnapshot.visibleCount}/13 components are visible in the multi-subject scan.`,
+        });
+      } else {
+        setIsChecklistStepOpen(true);
+      }
+      return;
+    }
+
     if (multiSubjectSnapshot) {
       setComponents({ ...multiSubjectSnapshot.components });
       setOriginalComponents({ ...multiSubjectSnapshot.originalComponents });
@@ -926,11 +1046,47 @@ export default function App() {
     setIsMultiSubjectModalOpen(false);
     setIsScanning(true);
     setSoloRewriteWarning(null);
+    setLowVisibilityError(null);
 
     const keptSubj = detectedSubjects.find((s) => s.id === subjectId);
     const keptLabel = keptSubj ? keptSubj.label : `Subject ${subjectId}`;
     const ignoredSubjs = detectedSubjects.filter((s) => s.id !== subjectId);
     const ignoredLabels = ignoredSubjs.map((s) => s.label);
+
+    const applyStoredMultiFallbackForSolo = (reasonNote: string, rawSoloPreview = '') => {
+      if (multiCanonicalSnapshot) {
+        const fallbackSolo = buildSoloFromMultiSnapshot(multiCanonicalSnapshot, subjectId);
+        applyCanonicalScanStructure(fallbackSolo.canonical, false);
+        setSoloRewriteWarning(
+          fallbackSolo.leakedFieldKeys.length > 0
+            ? `${reasonNote} Built solo view from stored multi-subject scan. ${fallbackSolo.leakedFieldKeys.length} scene field(s) flagged with "needs solo rewrite" badge.`
+            : `${reasonNote} Built solo view from stored multi-subject scan for ${keptLabel}.`
+        );
+        setScanDebugReport((prev) =>
+          prev
+            ? {
+                ...prev,
+                decisions: fallbackSolo.canonical.decisions,
+                soloDebug: {
+                  ran: true,
+                  httpStatus: 200,
+                  modelUsed: 'stored-multi-subject-fallback',
+                  finishReason: 'FALLBACK_TO_STORED_MULTI',
+                  responseLength: rawSoloPreview.length,
+                  jsonParseSucceeded: false,
+                  jsonRepaired: false,
+                  visibleCount: fallbackSolo.canonical.visibleCount,
+                  fallbackToStoredMultiUsed: true,
+                  rawModelTextPreview:
+                    rawSoloPreview || 'Used stored multi-subject snapshot for solo mode.',
+                },
+              }
+            : prev
+        );
+        return true;
+      }
+      return false;
+    };
 
     try {
       const customKey = StorageService.getCustomApiKey();
@@ -942,59 +1098,121 @@ export default function App() {
           outputRatio,
           keptSubjectLabel: keptLabel,
         },
-        { customKey, timeoutMs: 50000, maxRetries: 1 }
+        { customKey, timeoutMs: 55000, maxRetries: 1 }
       );
 
-      const soloAnalysis = res.analysis || {};
-      const newComps: Record<ComponentKey, DetectedComponent> = {} as any;
-      const newOriginals: Record<ComponentKey, DetectedComponent> = {} as any;
+      const soloMeta = res.debugMeta || {};
+      const soloQuotaFallback = Boolean(
+        res.isQuotaFallback || res.quotaFallback || soloMeta.quotaFallback
+      );
 
-      for (const key of ALL_COMPONENT_KEYS) {
-        const item = soloAnalysis.components?.[key];
-        const text = item?.detectedText ? item.detectedText.trim() : '';
-        const visibility = item?.visibility || (text ? 'visible' : 'unavailable');
-        const state: ComponentState = visibility === 'unavailable' ? 'unavailable' : 'locked';
+      let soloCanonical = normalizeScanResult(res, {
+        mode: 'solo',
+        keepIds: [subjectId],
+        fallbackRatio: outputRatio || '3:4',
+        finishReason: soloMeta.finishReason,
+        jsonRepaired: soloMeta.jsonRepaired,
+        activeTool,
+        activeProfile,
+      });
 
-        const base: DetectedComponent = {
-          key,
-          label: COMPONENT_LABELS[key],
-          detectedText: text,
-          userText: '',
-          state,
-          source: 'reference',
-          explanation: item?.explanation || '',
-          visibility,
-          subjectId,
-        };
-
-        newOriginals[key] = { ...base };
-        newComps[key] = { ...base };
+      // Targeted repair if solo response was truncated or < 60% present
+      if (soloCanonical.needsRepair && soloCanonical.missingCoreKeys.length > 0 && !soloQuotaFallback) {
+        try {
+          const repairRes = await postApiJson<any>(
+            '/api/repair-components',
+            {
+              image: { data: referenceImage.data, mimeType: referenceImage.mimeType },
+              missingKeys: soloCanonical.missingCoreKeys,
+              subjects: [{ id: subjectId, label: keptLabel, prominence: 'primary' }],
+              soloSubjectLabel: keptLabel,
+              outputRatio: soloCanonical.outputRatio,
+            },
+            { customKey, timeoutMs: 35000, maxRetries: 0 }
+          );
+          if (repairRes && repairRes.analysis) {
+            soloCanonical = mergeRepairedScanResult(soloCanonical, repairRes.analysis, {
+              mode: 'solo',
+              keepIds: [subjectId],
+              fallbackRatio: soloCanonical.outputRatio,
+              activeTool,
+              activeProfile,
+            });
+          }
+        } catch (repairErr) {
+          console.warn('Solo targeted repair warning:', repairErr);
+        }
       }
 
-      setOriginalComponents(newOriginals);
-      setComponents(newComps);
+      const rawSoloPreview =
+        typeof soloMeta.rawTextPreview === 'string'
+          ? soloMeta.rawTextPreview.slice(0, 1500)
+          : JSON.stringify(res.analysis || res).slice(0, 1500);
 
-      if (soloAnalysis.leadSentence) {
-        setScannedLeadSentence(soloAnalysis.leadSentence);
-      } else {
-        setScannedLeadSentence(`${keptLabel} in ${newComps.environment?.detectedText || 'scene'}.`);
+      // Fix 5: If /api/reanalyze-solo returns empty (< 3 visible) or quota template when we have real multi-subject data, build solo view from stored multi-subject result!
+      if ((soloCanonical.visibleCount < 3 || soloQuotaFallback) && multiCanonicalSnapshot) {
+        applyStoredMultiFallbackForSolo(
+          soloQuotaFallback
+            ? 'AI solo re-analysis hit quota limit.'
+            : `AI solo re-analysis returned only ${soloCanonical.visibleCount}/13 visible components.`,
+          rawSoloPreview
+        );
+        return;
       }
 
-      const leakCheck = findIgnoredSubjectLeaks(newComps, ignoredLabels, keptLabel);
+      // Leak guard check on solo components
+      const leakCheck = findIgnoredSubjectLeaks(
+        soloCanonical.activeComponents,
+        ignoredLabels,
+        keptLabel
+      );
       if (leakCheck.hasLeaks) {
         for (const leak of leakCheck.leaks) {
-          if (newComps[leak.key]) {
-            newComps[leak.key] = { ...newComps[leak.key], needsSoloRewrite: true };
+          if (soloCanonical.activeComponents[leak.key]) {
+            soloCanonical.activeComponents[leak.key] = {
+              ...soloCanonical.activeComponents[leak.key],
+              needsSoloRewrite: true,
+            };
+            soloCanonical.originalComponents[leak.key] = {
+              ...soloCanonical.originalComponents[leak.key],
+              needsSoloRewrite: true,
+            };
           }
         }
         setSoloRewriteWarning(
           `Some scene fields contain references to ignored subject(s) (${leakCheck.leaks.map((l) => l.label).join(', ')}). Click "Rewrite for Solo" to sanitize.`
         );
       }
+
+      applyCanonicalScanStructure(soloCanonical, false);
+
+      setScanDebugReport((prev) =>
+        prev
+          ? {
+              ...prev,
+              decisions: soloCanonical.decisions,
+              soloDebug: {
+                ran: true,
+                httpStatus: soloMeta.httpStatus || 200,
+                modelUsed: res.modelUsed || soloMeta.modelUsed || 'gemini-3.8-flash',
+                finishReason: soloMeta.finishReason || 'STOP',
+                responseLength: soloMeta.responseLength || rawSoloPreview.length,
+                jsonParseSucceeded: soloMeta.jsonParseSucceeded !== false,
+                jsonRepaired: Boolean(soloMeta.jsonRepaired),
+                repairNote: soloMeta.repairNote,
+                visibleCount: soloCanonical.visibleCount,
+                fallbackToStoredMultiUsed: false,
+                rawModelTextPreview: rawSoloPreview,
+              },
+            }
+          : prev
+      );
     } catch (err: any) {
       console.warn('Solo re-analysis notice:', err);
-
-      if (subjectComponents && subjectComponents[subjectId] && components) {
+      const usedStored = applyStoredMultiFallbackForSolo(
+        'Solo re-analysis request failed.'
+      );
+      if (!usedStored && subjectComponents && subjectComponents[subjectId] && components) {
         const keptPersonComps = subjectComponents[subjectId];
         const nextComps = { ...components };
         const nextOrig = originalComponents ? { ...originalComponents } : { ...components };
@@ -1644,8 +1862,21 @@ export default function App() {
             </div>
           </div>
 
-          {/* Primary Top-Level Navigation: Tools | Profiles | Projects with Spring Pill + PWA Install */}
+          {/* Primary Top-Level Navigation: Tools | Profiles | Projects with Spring Pill + PWA Install + Debug Toggle */}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleToggleDebug}
+              title="Toggle On-Screen Scan Debug Panel"
+              className={`min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold flex items-center gap-1.5 border transition cursor-pointer ${
+                isDebugEnabled
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-white/[0.04] text-zinc-400 hover:text-white border-white/10'
+              }`}
+            >
+              <Bug className="w-3.5 h-3.5" />
+              <span>Debug {isDebugEnabled ? 'ON' : 'OFF'}</span>
+            </button>
             <PWAInstallButton />
             <nav className="flex items-center gap-1 p-1 bg-black/50 backdrop-blur-xl border border-white/[0.09] rounded-xl">
               {(
@@ -2195,6 +2426,228 @@ export default function App() {
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>Retry Analysis</span>
                     </button>
+                  </div>
+                )}
+
+                {/* Fix 4: Clear Error Card when < 3 components are visible after repair */}
+                {lowVisibilityError && !isScanning && (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-red-950/50 border border-red-500/50 text-red-100 text-xs space-y-3 shadow-xl">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <div className="font-bold text-red-200 text-sm">
+                          Incomplete Scan Result ({lowVisibilityError.visibleCount}/13 Visible Components)
+                        </div>
+                        <p className="text-zinc-300 leading-relaxed">
+                          {lowVisibilityError.reason}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleScanReference}
+                        className="px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Retry</span>
+                      </button>
+                      {multiCanonicalSnapshot && multiCanonicalSnapshot.visibleCount >= 3 && (
+                        <button
+                          type="button"
+                          onClick={handleConsiderAllSubjects}
+                          className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-bold text-xs transition cursor-pointer"
+                        >
+                          Use multi-subject result
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLowVisibilityError(null);
+                          if (components) {
+                            const manualComps = { ...components };
+                            for (const k of ALL_COMPONENT_KEYS) {
+                              if (manualComps[k]?.state === 'unavailable') {
+                                manualComps[k] = {
+                                  ...manualComps[k],
+                                  state: 'edited',
+                                  visibility: 'visible',
+                                };
+                              }
+                            }
+                            setComponents(manualComps);
+                          }
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 font-semibold text-xs transition cursor-pointer"
+                      >
+                        Continue manually
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* PART 1: ON-SCREEN SCAN DEBUG PANEL (Phone Friendly, outside prompt output) */}
+                {isDebugEnabled && scanDebugReport && (
+                  <div className="rounded-2xl bg-[#0a0d14] border border-emerald-500/40 overflow-hidden shadow-xl text-xs font-mono">
+                    <div className="px-4 py-3 bg-emerald-950/40 border-b border-emerald-500/30 flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsDebugPanelOpen((prev) => !prev)}
+                        className="flex items-center gap-2 text-emerald-300 font-bold text-left cursor-pointer"
+                      >
+                        <Bug className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>
+                          On-Screen Scan Debug · HTTP {scanDebugReport.httpStatus} ·{' '}
+                          {scanDebugReport.modelUsed}
+                        </span>
+                        {isDebugPanelOpen ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyDebugReport}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-sans font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        {debugCopyFeedback ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Copied Debug Report</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy debug report</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {isDebugPanelOpen && (
+                      <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto text-[11px] text-zinc-300">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div className="p-2 rounded-lg bg-black/50 border border-white/10">
+                            <div className="text-zinc-500">HTTP / Model</div>
+                            <div className="text-white font-bold truncate">
+                              {scanDebugReport.httpStatus} · {scanDebugReport.modelUsed}
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-black/50 border border-white/10">
+                            <div className="text-zinc-500">finishReason / Length</div>
+                            <div className="text-white font-bold">
+                              {scanDebugReport.finishReason} ({scanDebugReport.responseLength} chars)
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-black/50 border border-white/10">
+                            <div className="text-zinc-500">JSON Parse / Repair</div>
+                            <div className="text-white font-bold">
+                              ok={String(scanDebugReport.jsonParseSucceeded)} · repaired=
+                              {String(scanDebugReport.jsonRepaired)}
+                            </div>
+                          </div>
+                          <div className="p-2 rounded-lg bg-black/50 border border-white/10">
+                            <div className="text-zinc-500">Quota Fallback / Repair Call</div>
+                            <div className="text-white font-bold">
+                              quota={String(scanDebugReport.quotaFallback)} · repairPass=
+                              {String(scanDebugReport.truncationRepairTriggered)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5 bg-black/40 p-3 rounded-xl border border-white/10">
+                          <div>
+                            <span className="text-zinc-500">Top-Level Keys: </span>
+                            <span className="text-emerald-300">
+                              [{scanDebugReport.topLevelKeys.join(', ')}]
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500">Subjects ({scanDebugReport.subjects.length}): </span>
+                            <span className="text-amber-300">
+                              {scanDebugReport.subjects
+                                .map((s) => `${s.id}: "${s.label}" (${s.prominence})`)
+                                .join(' | ')}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500">Shared Bucket Keys: </span>
+                            <span className="text-zinc-200">
+                              [{scanDebugReport.bucketKeysFound.shared.join(', ')}]
+                            </span>
+                          </div>
+                          {Object.entries(scanDebugReport.bucketKeysFound.perSubject).map(
+                            ([sid, keys]) => (
+                              <div key={sid}>
+                                <span className="text-zinc-500">
+                                  Person Bucket [{sid}] Keys:{' '}
+                                </span>
+                                <span className="text-zinc-200">[{(keys as string[]).join(', ')}]</span>
+                              </div>
+                            )
+                          )}
+                          <div>
+                            <span className="text-zinc-500">Flat Components Keys: </span>
+                            <span className="text-zinc-200">
+                              [{scanDebugReport.bucketKeysFound.flatComponents.join(', ')}]
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="text-zinc-400 font-bold">
+                            14 Component Visibility Decisions & Reasons:
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {scanDebugReport.decisions.map((d) => (
+                              <div
+                                key={d.key}
+                                className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${
+                                  d.visibility === 'unavailable'
+                                    ? 'bg-red-950/30 border-red-500/30 text-red-200'
+                                    : 'bg-emerald-950/20 border-emerald-500/20 text-emerald-200'
+                                }`}
+                              >
+                                <span className="font-bold">
+                                  {d.key} <span className="text-zinc-400">({d.bucket})</span>
+                                </span>
+                                <span className="text-right">
+                                  {d.visibility} · <span className="underline">{d.reason}</span> (
+                                  {d.textLength}c)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="text-zinc-400 font-bold">
+                            Raw Model Response Preview (first 1500 chars):
+                          </div>
+                          <pre className="p-2.5 rounded-xl bg-black/70 border border-white/10 text-[10px] text-zinc-300 whitespace-pre-wrap break-all max-h-44 overflow-y-auto">
+                            {scanDebugReport.rawModelTextPreview}
+                          </pre>
+                        </div>
+
+                        {scanDebugReport.soloDebug && (
+                          <div className="space-y-1.5 pt-2 border-t border-white/10">
+                            <div className="text-amber-300 font-bold">
+                              /api/reanalyze-solo Debug · HTTP {scanDebugReport.soloDebug.httpStatus}{' '}
+                              · {scanDebugReport.soloDebug.modelUsed} · finishReason=
+                              {scanDebugReport.soloDebug.finishReason} · visible=
+                              {scanDebugReport.soloDebug.visibleCount}/13 · fallbackToStoredMulti=
+                              {String(scanDebugReport.soloDebug.fallbackToStoredMultiUsed)}
+                            </div>
+                            <pre className="p-2.5 rounded-xl bg-black/70 border border-white/10 text-[10px] text-zinc-300 whitespace-pre-wrap break-all max-h-44 overflow-y-auto">
+                              {scanDebugReport.soloDebug.rawModelTextPreview}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
