@@ -359,6 +359,7 @@ function buildReferenceQuotaFallbackAnalysis(base64Data?: string, userNotes?: st
     summary: `Reference frame (${geom.width}×${geom.height}px, ${geom.outputRatio} ${geom.orientation.toLowerCase()}) loaded in local blueprint mode while Gemini API quota resets.${noteSuffix}`,
     outputRatio: geom.outputRatio,
     ratioExplanation: geom.ratioExplanation,
+    leadSentence: 'A single human subject in a photorealistic scene.',
     cameraEstimates: {
       viewpoint: 'Front-facing three-quarter view',
       elevation: 'Eye-level camera',
@@ -522,6 +523,76 @@ function buildCameraReferenceQuotaFallback(base64Data?: string) {
 }
 
 // Resilient model call helper with multi-key support, fast per-model timeout, and bounded total execution time
+function normalizeScanAnalysis(rawAnalysis: any, clientOutputRatio?: string): any {
+  if (!rawAnalysis || typeof rawAnalysis !== 'object') return rawAnalysis;
+
+  const cleanText = (str: any): string => {
+    if (typeof str !== 'string') return '';
+    let t = str.trim();
+    // Ban hedging words in detectedText
+    t = t.replace(/\b(or|\/)\b/gi, ' ');
+    t = t.replace(/\b(appears|seems|possibly|approximately)\b/gi, '');
+    // Clean double spaces
+    t = t.replace(/\s{2,}/g, ' ').trim();
+    return t;
+  };
+
+  const trimExplanation = (str: any): string => {
+    if (typeof str !== 'string') return '';
+    const words = str.trim().split(/\s+/);
+    if (words.length <= 15) return str.trim();
+    return words.slice(0, 15).join(' ');
+  };
+
+  // Process leadSentence & styleCategory
+  if (rawAnalysis.leadSentence) {
+    rawAnalysis.leadSentence = cleanText(rawAnalysis.leadSentence);
+  }
+  if (!rawAnalysis.styleCategory) {
+    rawAnalysis.styleCategory = 'photorealistic';
+  }
+
+  // Ensure outputRatio comes from client if provided
+  if (clientOutputRatio && clientOutputRatio.trim()) {
+    rawAnalysis.outputRatio = clientOutputRatio.trim();
+  }
+
+  // Normalize components
+  if (rawAnalysis.components && typeof rawAnalysis.components === 'object') {
+    for (const k of Object.keys(rawAnalysis.components)) {
+      const comp = rawAnalysis.components[k];
+      if (comp && typeof comp === 'object') {
+        comp.detectedText = cleanText(comp.detectedText);
+        comp.explanation = trimExplanation(comp.explanation);
+
+        if (!comp.visibility || !['visible', 'partial', 'unavailable'].includes(comp.visibility)) {
+          comp.visibility = comp.detectedText ? 'visible' : 'unavailable';
+        }
+        if (!comp.confidence || !['high', 'medium', 'estimated'].includes(comp.confidence)) {
+          comp.confidence = 'high';
+        }
+
+        // Camera specific sanity check: NEVER default to eye-level if elevation is below seat/floor/low
+        if (k === 'camera' && comp.detectedText) {
+          const lower = comp.detectedText.toLowerCase();
+          if (
+            (lower.includes('floor-level') ||
+              lower.includes('below seat') ||
+              lower.includes('near floor') ||
+              lower.includes('low-angle')) &&
+            lower.includes('eye-level')
+          ) {
+            comp.detectedText = comp.detectedText.replace(/\beye-level\b/gi, 'low camera elevation');
+          }
+        }
+      }
+    }
+  }
+
+  return rawAnalysis;
+}
+
+// Resilient model call helper with multi-key support, fast per-model timeout, and bounded total execution time
 async function generateWithFallback(
   aiOrKey: GoogleGenAI | string | undefined,
   parts: any[],
@@ -540,7 +611,6 @@ async function generateWithFallback(
     );
   };
 
-  // Build list of GoogleGenAI clients to try (supports fallback between customKey and server GEMINI_API_KEY)
   const candidateKeys = getCandidateGeminiApiKeys(
     typeof aiOrKey === 'string' ? aiOrKey : customKey
   );
@@ -551,19 +621,19 @@ async function generateWithFallback(
       ? [aiOrKey]
       : [getGenAIClient(customKey)];
 
-  // Fast 10s timeout per model so total server time stays well under the 60s reverse-proxy timeout
+  // Order: gemini-3.8-flash (primary), gemini-3.1-flash-lite, gemini-flash-latest
   const fallbackModels: Array<{
     name: string;
     timeoutMs: number;
     thinkingLevel?: ThinkingLevel;
   }> = [
-    { name: 'gemini-3.1-flash-lite', timeoutMs: 10000, thinkingLevel: ThinkingLevel.MINIMAL },
-    { name: 'gemini-3.8-flash', timeoutMs: 10000, thinkingLevel: ThinkingLevel.LOW },
-    { name: 'gemini-flash-latest', timeoutMs: 10000 },
+    { name: 'gemini-3.8-flash', timeoutMs: 18000, thinkingLevel: ThinkingLevel.LOW },
+    { name: 'gemini-3.1-flash-lite', timeoutMs: 18000, thinkingLevel: ThinkingLevel.LOW },
+    { name: 'gemini-flash-latest', timeoutMs: 18000 },
   ];
 
   const startTime = Date.now();
-  const MAX_TOTAL_BUDGET_MS = 26000;
+  const MAX_TOTAL_BUDGET_MS = 38000;
 
   let lastError: any = null;
   let modelUsed = fallbackModels[0].name;
@@ -585,7 +655,9 @@ async function generateWithFallback(
       if (modelIdx > 0) switchedToBackup = true;
 
       try {
-        const config: Record<string, any> = {};
+        const config: Record<string, any> = {
+          temperature: 0.2,
+        };
         if (modelConfig.thinkingLevel !== undefined) {
           config.thinkingConfig = { thinkingLevel: modelConfig.thinkingLevel };
         }
@@ -625,7 +697,6 @@ async function generateWithFallback(
           errMsg.toLowerCase().includes('api key not valid');
 
         if (isAuthError) {
-          // If there is another candidate key, break out of model loop to try next client key
           if (clientIdx + 1 < clients.length) {
             break;
           }
@@ -633,7 +704,6 @@ async function generateWithFallback(
         }
 
         if (isQuotaOrRateLimit(err)) {
-          // Try next model or next candidate API key
           continue;
         }
       }
@@ -655,7 +725,7 @@ app.get('/api/health', (req, res) => {
 // 1. 13-Component Reference Image Analyzer (Grounded strictly in uploaded image)
 app.post('/api/analyze-reference', async (req, res) => {
   try {
-    const { images, userNotes } = req.body;
+    const { images, userNotes, outputRatio: clientRatio } = req.body;
     const customKey = req.headers['x-gemini-key'] as string | undefined;
 
     if (!images || !Array.isArray(images) || images.length === 0) {
@@ -664,118 +734,76 @@ app.post('/api/analyze-reference', async (req, res) => {
 
     const ai = getGenAIClient(customKey);
 
-    const analysisPrompt = `You are a high-precision photographic and anatomical visual analysis engine for My Whisk AI.
+    const analysisPrompt = `You are a high-precision photographic, anatomical, and cinematographic visual analysis engine for My Whisk AI.
 
-Analyze the uploaded image at the highest practical level of visual detail.
-CRITICAL GROUNDING RULE:
-- Do NOT use preset descriptions or external defaults. Every extracted description MUST be grounded strictly in the actual uploaded image.
-- Do NOT invent details that cannot be established from the image.
-- Distinguish observed characteristics from uncertain inferences.
+Analyze the uploaded image in complete detail according to these STRICT RULES:
 
-VISIBILITY RULES (MANDATORY):
-- Analyze only the components supported by the uploaded image.
-- If a component is entirely outside the frame or cannot be meaningfully observed (for example: legs in a chest-up portrait, hands cropped out or completely hidden, or a face outside the frame), mark its "visibility" as "unavailable", set "detectedText" to "", and explain why in "explanation" (e.g., "Outside frame in chest-up crop").
-- If a component is partially visible, set "visibility" to "partial" and describe ONLY what can reasonably be established from the visible portion.
-- If clearly visible, set "visibility" to "visible".
+1. MULTI-SUBJECT DETECTION:
+- Count real people clearly part of the main composition in "subjects": [{ "id": "A", "label": "short description + position in frame", "prominence": "primary|secondary" }].
+- Exclude reflections, posters, statues, and tiny far-away background passers-by.
+- If 2 or more real subjects are present, include a scene-level "interaction" component describing contact points, relative positions, who is in front, gaze between them, and height difference. Also include "subjectComponents": { "A": { ...person components... }, "B": { ...person components... } }.
 
-EXTRACT ALL 13 COMPONENTS:
+2. DETECTED TEXT SPECIFICATION (1 to 3 CONCRETE PRESENT-TENSE SENTENCES, up to 4 for subject, clothing, background):
+- Every "detectedText" MUST contain the full prompt-ready description. Detail lives ONLY in "detectedText", never solely in "explanation".
+- ZERO HEDGING IN detectedText: NO "or", NO "/" between alternatives, NO "appears", "seems", "possibly", "approximately". Pick the single best-supported value; if truly uncertain, set "confidence": "estimated".
+- SPATIAL TERMINOLOGY: Use "frame-left / frame-right" for scene positions, and "subject's left / right" for body parts.
 
-1. subject:
-Describe the visible subject's relevant characteristics, including apparent age range, skin tone, visible facial features, hairstyle, hair texture, and other distinguishing visual characteristics. Prioritize visual accuracy and identity consistency. Do not invent details that cannot be established from the image.
+3. ZERO DUPLICATION ACROSS FIELDS:
+- subject: apparent age range, skin tone, face shape and features, hair length, texture, color, part, styling.
+- body: build and proportions only.
+- pose: whole-body posture, orientation, torso and shoulders, weight and physical support.
+- camera: MUST state camera height relative to the subject (floor-level, below seat, seat-height, waist, chest, eye-level, above), vertical tilt, horizontal direction, distance, lens character from perspective cues. NEVER default to "eye-level" unless the lens is at the subject's eye height.
+- framing: crop edges, headroom, footroom, side margins, fraction of frame that is empty floor or sky.
+- clothing: every garment with cut, fit, length, specific color name, fabric texture, construction details (neckline, cuffs, seams, closures), footwear, ornaments.
+- lighting: main source position relative to subject and camera, softness, intensity, color temperature, resulting shadows and highlights on face and body, fill or bounce, key (high-key or low-key), contrast.
+- background: specific objects, surfaces, colors, and where they sit in the frame.
+- environment: type of place and overall atmosphere.
+- composition: placement, balance, leading lines.
+- facial_expression: MUST include gaze direction (direct to lens or off-axis), eyebrow position, eyelid opening, mouth state.
+- hand_gestures & leg_gestures: fine detail per limb (palm direction, finger spread, arm straightness, knee spacing, feet placement, shin angle).
 
-2. body:
-Describe visible body proportions, silhouette, build, anatomical relationships, and body geometry as accurately as the image permits. Distinguish observed characteristics from uncertain inferences.
+4. EVIDENCE FIELD ("explanation"):
+- Short evidence note, MAXIMUM 15 WORDS (e.g. "Floor fills lower quarter, bed side visible, no mattress top").
 
-3. pose:
-Analyze the complete visible pose, including body orientation, torso rotation, shoulder alignment, head tilt, weight distribution, balance, joint articulation, limb positions, and points of physical support. Describe the actual spatial relationships between body parts instead of relying on vague descriptions.
+5. LEAD SENTENCE & SUMMARY:
+- Provide "leadSentence": a clean prompt-starter sentence describing the main subject, pose, and setting (e.g., "A young woman sits on the edge of a low platform bed in a bright, modern bedroom.").
+- Set "styleCategory": "photorealistic" | "illustration" | "3D" | "painting".
+- Write "summary" LAST so it never contradicts any field.
 
-4. camera:
-Analyze:
-- Camera viewpoint and horizontal viewing direction (e.g., front-facing view, three-quarter view, side profile, rear view).
-- Camera elevation relative to the subject (e.g., eye-level camera, low-angle shot, high-angle shot, upward-looking, downward-looking).
-- Apparent camera-to-subject distance.
-- Shot size and perspective characteristics.
-- Lens or focal-length characteristics when reasonably inferable (use descriptive terminology; NEVER invent unsupported numerical focal lengths or exact angle degrees).
-- Perspective distortion and visible spatial relationships.
+${userNotes?.trim() ? `Additional user notes:\n${userNotes.trim()}\n` : ''}
 
-5. framing:
-Precisely describe:
-- Shot size (full-body, three-quarter-body, half-body, waist-up, chest-up, portrait, close-up).
-- Which body parts are visible and where the image frame cuts off the subject.
-- Subject placement within the frame, headroom, footroom, and lateral margins.
-- Subject scale relative to the image, foreground/background spacing, aspect ratio, and crop characteristics.
-
-6. clothing:
-Describe visible garments, garment categories, colors, patterns, fabrics, textures, fit, construction, necklines, sleeves, hems, folds, draping, layering, accessories, and footwear if visible. Do not invent hidden garment details.
-
-7. lighting:
-Analyze the apparent light source, direction, elevation, softness, intensity, color temperature, highlights, shadows, ambient illumination, contrast, reflected light, and shadow behavior. Distinguish clearly visible lighting characteristics from uncertain inferences.
-
-8. background:
-Describe the actual visible background, including objects, structures, surfaces, colors, textures, spatial arrangement, and depth.
-
-9. environment:
-Describe the apparent setting and environmental context, including indoor or outdoor characteristics, architectural elements, surrounding vegetation, weather-related conditions when visible, and contextual details. Keep environmental observations separate from individual background objects.
-
-10. composition:
-Analyze the overall arrangement of the subject and surrounding elements, visual balance, subject placement, negative space, leading lines, depth layers, visual hierarchy, and compositional characteristics.
-
-11. facial_expression:
-Analyze the visible facial expression at a detailed physical level:
-- Eyebrow position and shape.
-- Eyelid position and degree of eye opening.
-- Gaze direction, eye tension, and visible muscle engagement.
-- Mouth opening and shape, lip contour, rounding, stretching, and compression.
-- Visible teeth and tongue, when applicable.
-- Cheek tension, symmetry or asymmetry, and the combined physical configuration of visible facial features.
-Describe the actual physical configuration rather than vague emotion labels ("happy", "sad", "surprised") alone. If the face is outside the frame or obscured, mark visibility as "unavailable".
-
-12. hand_gestures:
-Analyze each visible arm, wrist, hand, palm, and finger configuration independently:
-- Left and right arm positions, upper-arm and forearm orientation, elbow flexion or extension.
-- Wrist orientation and bending, palm orientation relative to camera and body.
-- Finger positions, separation, curling, extension, and thumb placement.
-- Hand shape, contact with body/clothing/furniture/objects, and whether the hand supports weight, rests, grips, points, or reaches.
-- Spatial relationship between each arm and the rest of the body.
-If hands/arms are outside the frame, mark visibility as "unavailable".
-
-13. leg_gestures:
-Analyze each visible leg independently:
-- Thigh and lower-leg orientation, hip, knee, and ankle positioning, knee flexion or extension.
-- Foot direction and placement, leg crossing, separation, bending, and extension.
-- Weight-bearing relationships and contact with ground, furniture, or surfaces.
-- Spatial relationship between both legs and torso, plus visible footwear and its relationship to foot positioning.
-If legs are outside the frame (e.g., waist-up or close-up shot), mark visibility as "unavailable".
-
-${userNotes?.trim() ? `Additional user context:\n${userNotes.trim()}\n` : ''}
-
-Return VALID, PURE JSON matching this exact schema:
+Return VALID, PURE JSON matching this schema:
 {
-  "summary": "Concise 1-2 sentence overview of the analyzed reference image",
-  "outputRatio": "3:4",
-  "ratioExplanation": "Justification for the aspect ratio based on frame geometry",
+  "leadSentence": "A young woman sits on the edge of a low platform bed in a bright, modern bedroom.",
+  "styleCategory": "photorealistic",
+  "summary": "1-2 sentence overview of the analyzed reference image",
+  "outputRatio": "${clientRatio || '3:4'}",
+  "ratioExplanation": "Measured from frame geometry",
+  "subjects": [
+    { "id": "A", "label": "Woman seated on platform bed", "prominence": "primary" }
+  ],
   "cameraEstimates": {
-    "viewpoint": "e.g. Three-quarter view",
-    "elevation": "e.g. Eye-level camera",
-    "shotSize": "e.g. Waist-up shot",
-    "framing": "Detailed framing summary",
-    "distance": "e.g. Medium portrait distance",
-    "angleOfView": "e.g. Natural normal perspective"
+    "viewpoint": "Front-facing view",
+    "elevation": "Below seat height",
+    "shotSize": "Medium shot",
+    "framing": "Vertical frame with empty floor in lower quarter",
+    "distance": "Medium portrait distance",
+    "angleOfView": "Wide-angle perspective with slight upward tilt"
   },
   "components": {
-    "subject": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "body": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "pose": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "camera": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "framing": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "clothing": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "lighting": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "background": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "environment": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "composition": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "facial_expression": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "hand_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible" },
-    "leg_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible" }
+    "subject": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "body": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "pose": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "camera": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "framing": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "clothing": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "lighting": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "background": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "environment": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "composition": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "facial_expression": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "hand_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" },
+    "leg_gestures": { "detectedText": "...", "explanation": "...", "visibility": "visible", "confidence": "high" }
   }
 }`;
 
@@ -795,7 +823,8 @@ Return VALID, PURE JSON matching this exact schema:
       true,
       customKey
     );
-    const parsed = parseModelJson(text);
+    let parsed = parseModelJson(text);
+    parsed = normalizeScanAnalysis(parsed, clientRatio);
 
     res.json({
       success: true,
@@ -816,8 +845,7 @@ Return VALID, PURE JSON matching this exact schema:
         modelUsed: 'local-geometry-blueprint',
         switchedToBackup: true,
         quotaFallback: true,
-        warning:
-          'Live Gemini quota or model capacity was temporarily reached. Initialized editable 13-component blueprint using measured image geometry so you can continue working without interruption.',
+        warning: 'Estimated blueprint, not an AI analysis',
       });
     }
 
@@ -829,6 +857,151 @@ Return VALID, PURE JSON matching this exact schema:
       error: msg,
       code: typeof error?.code === 'string' ? error.code : undefined,
     });
+  }
+});
+
+// Endpoint: Solo Subject Re-analysis (Phase 2)
+app.post('/api/reanalyze-solo', async (req, res) => {
+  try {
+    const { image, keepIds, outputRatio, keptSubjectLabel } = req.body;
+    const customKey = req.headers['x-gemini-key'] as string | undefined;
+
+    if (!image || !image.data) {
+      return res.status(400).json({ error: 'An image is required for solo re-analysis.' });
+    }
+
+    const ai = getGenAIClient(customKey);
+    const targetId = Array.isArray(keepIds) && keepIds.length > 0 ? keepIds[0] : 'A';
+    const subjName = keptSubjectLabel || `Subject ${targetId}`;
+
+    const soloPrompt = `You are a high-precision photographic visual analysis engine for My Whisk AI.
+The user wishes to analyze ${subjName} ONLY and COMPLETELY IGNORE all other people in the image.
+
+RE-ANALYSIS MANDATE:
+1. Re-describe pose, body, hand_gestures, leg_gestures, facial_expression, clothing, framing, camera, lighting, environment, background, and composition as if ${subjName} is the ONLY person in the scene.
+2. If ${subjName} has gestures or physical contact directed at an ignored person, phrase it as directed toward empty space (e.g. "right hand extended forward in a relaxed gesture toward empty space").
+3. Remove EVERY mention of any ignored person, "both", "two", "the subjects", "the couple", or second person from ALL fields.
+4. Set leadSentence to a rich, specific description of ${subjName} and setting only (e.g. "A woman in her late 20s with long brown hair, leaning forward on a sofa in a bright residential living room."). DO NOT include "No other person is present in the frame" in leadSentence.
+5. Ensure ENVIRONMENT is described independently as its own atmospheric/setting context.
+6. Follow all standard rules: 1-3 concrete present-tense sentences for detectedText, no hedging ("or", "/", "appears", "seems", "possibly", "approximately", "likely"), evidence max 15 words.
+
+Return VALID, PURE JSON matching the single-subject analysis schema.`;
+
+    const parts = [
+      { text: soloPrompt },
+      { inlineData: { mimeType: image.mimeType || 'image/jpeg', data: image.data } },
+    ];
+
+    const { text, modelUsed, switchedToBackup } = await generateWithFallback(
+      ai,
+      parts,
+      true,
+      customKey
+    );
+    let parsed = parseModelJson(text);
+    parsed = normalizeScanAnalysis(parsed, outputRatio);
+
+    res.json({
+      success: true,
+      analysis: parsed,
+      modelUsed,
+      switchedToBackup,
+    });
+  } catch (error: any) {
+    const msg = formatServerErrorMessage(error, 'Failed to reanalyze solo subject.');
+    console.warn('Solo reanalysis fallback:', msg);
+
+    const fallback = buildReferenceQuotaFallbackAnalysis(req.body?.image?.data);
+    fallback.leadSentence = 'A woman in her late 20s, sitting in a bright room.';
+    res.status(200).json({
+      success: true,
+      analysis: fallback,
+      quotaFallback: true,
+      warning: 'Local solo subject fallback used. Please review scene fields.',
+    });
+  }
+});
+
+// Endpoint: AI Targeted Solo Field Rewrite
+app.post('/api/rewrite-fields-solo', async (req, res) => {
+  try {
+    const { fields, keptSubjectLabel } = req.body;
+    const customKey = req.headers['x-gemini-key'] as string | undefined;
+
+    if (!fields || typeof fields !== 'object') {
+      return res.status(400).json({ error: 'Fields object is required for rewrite.' });
+    }
+
+    const ai = getGenAIClient(customKey);
+    const rewritePrompt = `You are a photographic prompt sanitizer for My Whisk AI.
+Rewrite the following visual component fields so they refer ONLY to the kept subject (${keptSubjectLabel || 'primary subject'}) and completely eliminate any mention of second/ignored subjects, plural terms ("both", "two", "the subjects", "each other"), or multi-person interactions.
+Keep descriptions specific, present tense, and prompt-ready.
+
+FIELDS TO REWRITE:
+${JSON.stringify(fields, null, 2)}
+
+Return PURE JSON matching: { "rewrittenFields": { "fieldKey": "sanitized description" } }`;
+
+    const parts = [{ text: rewritePrompt }];
+    const { text } = await generateWithFallback(ai, parts, true, customKey);
+    const parsed = parseModelJson(text);
+
+    res.json({
+      success: true,
+      rewrittenFields: parsed?.rewrittenFields || parsed || {},
+    });
+  } catch (error: any) {
+    const msg = formatServerErrorMessage(error, 'Failed to rewrite fields for solo mode.');
+    res.status(500).json({ error: msg });
+  }
+});
+
+// Endpoint: Deep AI Prompt Consistency Check (Phase 4)
+app.post('/api/check-prompt', async (req, res) => {
+  try {
+    const { promptText } = req.body;
+    const customKey = req.headers['x-gemini-key'] as string | undefined;
+
+    if (!promptText) {
+      return res.status(400).json({ error: 'Prompt text is required for deep check.' });
+    }
+
+    const ai = getGenAIClient(customKey);
+
+    const checkPrompt = `You are an expert prompt consistency validator for image generation models.
+Analyze the prompt below for subtle physical, spatial, posture, camera, or lighting contradictions:
+
+PROMPT TO CHECK:
+${promptText}
+
+Return PURE JSON matching this schema:
+{
+  "hasIssues": boolean,
+  "issues": [
+    {
+      "id": "issue_1",
+      "fieldA": "Field A",
+      "fieldB": "Field B",
+      "labelA": "Label A",
+      "labelB": "Label B",
+      "textA": "Text A",
+      "textB": "Text B",
+      "explanation": "Description of conflict"
+    }
+  ]
+}`;
+
+    const parts = [{ text: checkPrompt }];
+    const { text } = await generateWithFallback(ai, parts, true, customKey);
+    const parsed = parseModelJson(text);
+
+    res.json({
+      success: true,
+      check: parsed,
+    });
+  } catch (error: any) {
+    const msg = formatServerErrorMessage(error, 'Failed to perform deep check.');
+    res.status(500).json({ error: msg });
   }
 });
 

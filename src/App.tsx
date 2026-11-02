@@ -26,6 +26,9 @@ import {
   exportPromptForModel,
   checkPromptSafety,
 } from './services/promptBuilder';
+import { checkPromptContradictions } from './services/contradictionCheck';
+import { findIgnoredSubjectLeaks } from './services/leakGuard';
+import { SubjectData, ContradictionIssue } from './types';
 import { ComponentCard } from './components/ComponentCard';
 import { ScanProgressPanel } from './components/ScanProgressPanel';
 import { ProfileManager } from './components/ProfileManager';
@@ -64,6 +67,13 @@ import {
   ChevronUp,
   ExternalLink,
   ArrowLeft,
+  AlertTriangle,
+  Info,
+  X,
+  CheckSquare,
+  Square,
+  User,
+  ListChecks,
 } from 'lucide-react';
 
 function checkIsCameraRoute(): { isCameraRoute: boolean; mode: 'playboard' | 'extractor' } {
@@ -203,6 +213,40 @@ export default function App() {
   const [outputRatio, setOutputRatio] = useState<string>('3:4');
   const [ratioExplanation, setRatioExplanation] = useState<string>('');
   const [scanSummary, setScanSummary] = useState<string>('');
+
+  // Scan Quality, Multi-Subject, Checklist & Contradiction State (Phases 1-4)
+  const [scannedLeadSentence, setScannedLeadSentence] = useState<string>('');
+  const [scannedStyleCategory, setScannedStyleCategory] = useState<
+    'photorealistic' | 'illustration' | '3D' | 'painting'
+  >('photorealistic');
+  const [scannedModelUsed, setScannedModelUsed] = useState<string>('');
+  const [isQuotaFallback, setIsQuotaFallback] = useState<boolean>(false);
+  const [quotaFallbackAcknowledged, setQuotaFallbackAcknowledged] = useState<boolean>(false);
+
+  // Multi-Subject state (Phase 2)
+  const [detectedSubjects, setDetectedSubjects] = useState<SubjectData[]>([]);
+  const [subjectComponents, setSubjectComponents] =
+    useState<Record<string, Record<ComponentKey, DetectedComponent>> | null>(null);
+  const [activeSubjectDecision, setActiveSubjectDecision] = useState<'all' | 'solo'>('all');
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>(['A']);
+  const [isMultiSubjectModalOpen, setIsMultiSubjectModalOpen] = useState<boolean>(false);
+  const [multiSubjectSnapshot, setMultiSubjectSnapshot] = useState<{
+    components: Record<ComponentKey, DetectedComponent>;
+    originalComponents: Record<ComponentKey, DetectedComponent>;
+    subjects: SubjectData[];
+    subjectComponents?: Record<string, Record<ComponentKey, DetectedComponent>> | null;
+  } | null>(null);
+  const [soloRewriteWarning, setSoloRewriteWarning] = useState<string | null>(null);
+  const [isRewritingFields, setIsRewritingFields] = useState<boolean>(false);
+
+  // Tick-box Checklist state (Phase 3)
+  const [isChecklistStepOpen, setIsChecklistStepOpen] = useState<boolean>(false);
+  const [tickedComponentKeys, setTickedComponentKeys] = useState<ComponentKey[]>(ALL_COMPONENT_KEYS);
+
+  // Contradiction Check state (Phase 4)
+  const [contradictionIssues, setContradictionIssues] = useState<ContradictionIssue[]>([]);
+  const [isContradictionModalOpen, setIsContradictionModalOpen] = useState<boolean>(false);
+  const [isPerformingDeepCheck, setIsPerformingDeepCheck] = useState<boolean>(false);
 
   // Camera Angle Controller settings & 11-Component Camera Reference state
   const [cameraSettings, setCameraSettings] =
@@ -489,6 +533,30 @@ export default function App() {
     }
   };
 
+  function calculateNearestRatio(width: number, height: number): string {
+    const ratio = width / height;
+    const ratios: { label: string; value: number }[] = [
+      { label: '1:1', value: 1 },
+      { label: '4:3', value: 4 / 3 },
+      { label: '3:4', value: 3 / 4 },
+      { label: '16:9', value: 16 / 9 },
+      { label: '9:16', value: 9 / 16 },
+      { label: '2:3', value: 2 / 3 },
+      { label: '3:2', value: 3 / 2 },
+      { label: '21:9', value: 21 / 9 },
+    ];
+    let closest = ratios[0];
+    let minDiff = Math.abs(ratio - ratios[0].value);
+    for (let i = 1; i < ratios.length; i++) {
+      const diff = Math.abs(ratio - ratios[i].value);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = ratios[i];
+      }
+    }
+    return closest.label;
+  }
+
   // Optimize single uploaded image via HTML5 Canvas
   const optimizeImageFile = (file: File, label = 'Reference Image'): Promise<ImageDataItem> => {
     return new Promise((resolve) => {
@@ -500,6 +568,11 @@ export default function App() {
           const MAX_DIM = 1024;
           let width = img.width;
           let height = img.height;
+
+          const detectedRatio = calculateNearestRatio(img.width, img.height);
+          if (label === 'Primary Reference' || label === 'Reference Image') {
+            setOutputRatio(detectedRatio);
+          }
 
           if (width > MAX_DIM || height > MAX_DIM) {
             if (width > height) {
@@ -689,12 +762,13 @@ export default function App() {
             mimeType: referenceImage.mimeType,
           },
         ],
+        outputRatio,
       };
 
       const data = await postApiJson<any>('/api/analyze-reference', payload, {
         customKey,
-        timeoutMs: 45000,
-        maxRetries: 2,
+        timeoutMs: 50000,
+        maxRetries: 1,
       });
 
       clearInterval(timer);
@@ -703,8 +777,25 @@ export default function App() {
 
       const analysis = data.analysis || {};
       setScanSummary(analysis.summary || 'Reference analyzed into 13 grounded visual components.');
-      setOutputRatio(analysis.outputRatio || '3:4');
+      const finalRatio = data.outputRatio || analysis.outputRatio || outputRatio || '3:4';
+      setOutputRatio(finalRatio);
       setRatioExplanation(analysis.ratioExplanation || '');
+      setScannedLeadSentence(data.leadSentence || analysis.leadSentence || '');
+      setScannedStyleCategory(data.styleCategory || analysis.styleCategory || 'photorealistic');
+      setScannedModelUsed(data.modelUsed || '');
+
+      const quotaFallback = Boolean(data.isQuotaFallback);
+      setIsQuotaFallback(quotaFallback);
+      if (quotaFallback) {
+        setQuotaFallbackAcknowledged(false);
+      }
+
+      // Populate detected subjects (Phase 2)
+      const subjects: SubjectData[] = data.subjects || analysis.subjects || [];
+      setDetectedSubjects(subjects);
+      setSubjectComponents(data.subjectComponents || null);
+      setActiveSubjectDecision('all');
+      setSelectedSubjectIds(subjects.map((s) => s.id));
 
       // Populate Camera Angle Controller initial estimates from the analyzed image
       const est = analysis.cameraEstimates || {};
@@ -721,7 +812,7 @@ export default function App() {
         customNotes: '',
       });
 
-      // Build all 13 components grounded strictly in the actual image (NO preset descriptions injected on scan)
+      // Build all 13 components grounded strictly in the actual image
       const originalSnap: Record<ComponentKey, DetectedComponent> = {} as any;
       const workingComps: Record<ComponentKey, DetectedComponent> = {} as any;
 
@@ -752,8 +843,6 @@ export default function App() {
 
         originalSnap[key] = { ...baseComp };
 
-        // If user is currently in Subject Swapping tool, pre-apply the selected replacement Subject & Body
-        // while keeping originalSnap intact so the user can restore the original scanned subject anytime
         if (activeTool === 'subject_swapping' && (key === 'subject' || key === 'body')) {
           workingComps[key] = {
             ...baseComp,
@@ -770,6 +859,16 @@ export default function App() {
 
       setOriginalComponents(originalSnap);
       setComponents(workingComps);
+
+      if (subjects.length >= 2) {
+        setMultiSubjectSnapshot({
+          components: { ...workingComps },
+          originalComponents: { ...originalSnap },
+          subjects: [...subjects],
+          subjectComponents: data.subjectComponents || null,
+        });
+      }
+
       setGeneratedMasterPrompt(null);
       setGeneratedNegativePrompt('');
       setHasUnbuiltChanges(false);
@@ -778,6 +877,13 @@ export default function App() {
           ? `${referenceImage.name.replace(/\.[^.]+$/, '')}`
           : `Analysis ${new Date().toLocaleDateString()}`
       );
+
+      // Open Multi-subject modal or Checklist drawer
+      if (subjects.length >= 2) {
+        setIsMultiSubjectModalOpen(true);
+      } else {
+        setIsChecklistStepOpen(true);
+      }
       triggerHaptic();
     } catch (err: any) {
       clearInterval(timer);
@@ -785,6 +891,248 @@ export default function App() {
       setScanError(extractApiErrorMessage(err, 'Reference analysis could not be completed.'));
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  // Phase 2: Multi-subject decision handlers
+  const handleConsiderAllSubjects = () => {
+    if (multiSubjectSnapshot) {
+      setComponents({ ...multiSubjectSnapshot.components });
+      setOriginalComponents({ ...multiSubjectSnapshot.originalComponents });
+      setDetectedSubjects(multiSubjectSnapshot.subjects);
+      setSubjectComponents(multiSubjectSnapshot.subjectComponents || null);
+    }
+    setActiveSubjectDecision('all');
+    setSelectedSubjectIds(detectedSubjects.map((s) => s.id));
+    setIsMultiSubjectModalOpen(false);
+    setIsChecklistStepOpen(true);
+    setSoloRewriteWarning(null);
+  };
+
+  const handleSelectSoloSubject = async (subjectId: string) => {
+    if (!referenceImage) return;
+
+    if (!multiSubjectSnapshot && components && originalComponents) {
+      setMultiSubjectSnapshot({
+        components: { ...components },
+        originalComponents: { ...originalComponents },
+        subjects: [...detectedSubjects],
+        subjectComponents: subjectComponents || null,
+      });
+    }
+
+    setActiveSubjectDecision('solo');
+    setSelectedSubjectIds([subjectId]);
+    setIsMultiSubjectModalOpen(false);
+    setIsScanning(true);
+    setSoloRewriteWarning(null);
+
+    const keptSubj = detectedSubjects.find((s) => s.id === subjectId);
+    const keptLabel = keptSubj ? keptSubj.label : `Subject ${subjectId}`;
+    const ignoredSubjs = detectedSubjects.filter((s) => s.id !== subjectId);
+    const ignoredLabels = ignoredSubjs.map((s) => s.label);
+
+    try {
+      const customKey = StorageService.getCustomApiKey();
+      const res = await postApiJson<any>(
+        '/api/reanalyze-solo',
+        {
+          image: { data: referenceImage.data, mimeType: referenceImage.mimeType },
+          keepIds: [subjectId],
+          outputRatio,
+          keptSubjectLabel: keptLabel,
+        },
+        { customKey, timeoutMs: 50000, maxRetries: 1 }
+      );
+
+      const soloAnalysis = res.analysis || {};
+      const newComps: Record<ComponentKey, DetectedComponent> = {} as any;
+      const newOriginals: Record<ComponentKey, DetectedComponent> = {} as any;
+
+      for (const key of ALL_COMPONENT_KEYS) {
+        const item = soloAnalysis.components?.[key];
+        const text = item?.detectedText ? item.detectedText.trim() : '';
+        const visibility = item?.visibility || (text ? 'visible' : 'unavailable');
+        const state: ComponentState = visibility === 'unavailable' ? 'unavailable' : 'locked';
+
+        const base: DetectedComponent = {
+          key,
+          label: COMPONENT_LABELS[key],
+          detectedText: text,
+          userText: '',
+          state,
+          source: 'reference',
+          explanation: item?.explanation || '',
+          visibility,
+          subjectId,
+        };
+
+        newOriginals[key] = { ...base };
+        newComps[key] = { ...base };
+      }
+
+      setOriginalComponents(newOriginals);
+      setComponents(newComps);
+
+      if (soloAnalysis.leadSentence) {
+        setScannedLeadSentence(soloAnalysis.leadSentence);
+      } else {
+        setScannedLeadSentence(`${keptLabel} in ${newComps.environment?.detectedText || 'scene'}.`);
+      }
+
+      const leakCheck = findIgnoredSubjectLeaks(newComps, ignoredLabels, keptLabel);
+      if (leakCheck.hasLeaks) {
+        for (const leak of leakCheck.leaks) {
+          if (newComps[leak.key]) {
+            newComps[leak.key] = { ...newComps[leak.key], needsSoloRewrite: true };
+          }
+        }
+        setSoloRewriteWarning(
+          `Some scene fields contain references to ignored subject(s) (${leakCheck.leaks.map((l) => l.label).join(', ')}). Click "Rewrite for Solo" to sanitize.`
+        );
+      }
+    } catch (err: any) {
+      console.warn('Solo re-analysis notice:', err);
+
+      if (subjectComponents && subjectComponents[subjectId] && components) {
+        const keptPersonComps = subjectComponents[subjectId];
+        const nextComps = { ...components };
+        const nextOrig = originalComponents ? { ...originalComponents } : { ...components };
+
+        const personKeys: ComponentKey[] = [
+          'subject',
+          'body',
+          'pose',
+          'facial_expression',
+          'hand_gestures',
+          'leg_gestures',
+          'clothing',
+        ];
+
+        for (const pk of personKeys) {
+          if (keptPersonComps[pk]) {
+            nextComps[pk] = { ...keptPersonComps[pk], subjectId };
+            nextOrig[pk] = { ...keptPersonComps[pk], subjectId };
+          }
+        }
+
+        const leakCheck = findIgnoredSubjectLeaks(nextComps, ignoredLabels, keptLabel);
+        if (leakCheck.hasLeaks) {
+          for (const leak of leakCheck.leaks) {
+            if (nextComps[leak.key]) {
+              nextComps[leak.key] = { ...nextComps[leak.key], needsSoloRewrite: true };
+            }
+          }
+          setSoloRewriteWarning(
+            `Offline fallback used: ${leakCheck.leaks.length} field(s) (${leakCheck.leaks.map((l) => l.label).join(', ')}) contain references to ignored subjects. Click "Rewrite for Solo" to sanitize.`
+          );
+        }
+
+        setOriginalComponents(nextOrig);
+        setComponents(nextComps);
+        setScannedLeadSentence(`${keptLabel} in ${nextComps.environment?.detectedText || 'scene'}.`);
+      }
+    } finally {
+      setIsScanning(false);
+      setIsChecklistStepOpen(true);
+    }
+  };
+
+  const handleRewriteFieldsSolo = async () => {
+    if (!components) return;
+    setIsRewritingFields(true);
+
+    const keptSubjId = selectedSubjectIds[0] || 'A';
+    const keptSubj = detectedSubjects.find((s) => s.id === keptSubjId);
+    const keptLabel = keptSubj ? keptSubj.label : `Subject ${keptSubjId}`;
+    const ignoredSubjs = detectedSubjects.filter((s) => s.id !== keptSubjId);
+    const ignoredLabels = ignoredSubjs.map((s) => s.label);
+
+    const leakCheck = findIgnoredSubjectLeaks(components, ignoredLabels, keptLabel);
+    const fieldsToRewrite: Record<string, string> = {};
+
+    for (const leak of leakCheck.leaks) {
+      fieldsToRewrite[leak.key] = leak.text;
+    }
+
+    if (Object.keys(fieldsToRewrite).length === 0) {
+      setIsRewritingFields(false);
+      setSoloRewriteWarning(null);
+      return;
+    }
+
+    try {
+      const customKey = StorageService.getCustomApiKey();
+      const res = await postApiJson<any>(
+        '/api/rewrite-fields-solo',
+        { fields: fieldsToRewrite, keptSubjectLabel: keptLabel },
+        { customKey }
+      );
+
+      const rewritten = res.rewrittenFields || {};
+      const nextComps = { ...components };
+      const nextOrig = originalComponents ? { ...originalComponents } : { ...components };
+
+      for (const k of Object.keys(rewritten) as ComponentKey[]) {
+        if (nextComps[k]) {
+          nextComps[k] = {
+            ...nextComps[k],
+            detectedText: rewritten[k],
+            userText: nextComps[k].state === 'edited' ? rewritten[k] : nextComps[k].userText,
+            needsSoloRewrite: false,
+          };
+          nextOrig[k] = {
+            ...nextOrig[k],
+            detectedText: rewritten[k],
+            needsSoloRewrite: false,
+          };
+        }
+      }
+
+      setComponents(nextComps);
+      setOriginalComponents(nextOrig);
+      setSoloRewriteWarning(null);
+      triggerHaptic();
+    } catch (err: any) {
+      console.warn('Field rewrite failed:', err);
+    } finally {
+      setIsRewritingFields(false);
+    }
+  };
+
+  // Phase 3: Checklist drawer handlers
+  const handleToggleChecklistKey = (key: ComponentKey) => {
+    setTickedComponentKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  const handleFinishChecklist = () => {
+    setIsChecklistStepOpen(false);
+    if (!components) return;
+    const next = { ...components };
+    for (const key of ALL_COMPONENT_KEYS) {
+      if (!tickedComponentKeys.includes(key) && next[key].state !== 'unavailable') {
+        next[key] = { ...next[key], state: 'ignored' };
+      } else if (tickedComponentKeys.includes(key) && next[key].state === 'ignored') {
+        next[key] = { ...next[key], state: 'locked' };
+      }
+    }
+    setComponents(next);
+
+    if (activeSubjectDecision === 'solo') {
+      const keptSubjId = selectedSubjectIds[0] || 'A';
+      const keptSubj = detectedSubjects.find((s) => s.id === keptSubjId);
+      const keptLabel = keptSubj ? keptSubj.label : `Subject ${keptSubjId}`;
+      const ignoredSubjs = detectedSubjects.filter((s) => s.id !== keptSubjId);
+      const ignoredLabels = ignoredSubjs.map((s) => s.label);
+
+      const leakCheck = findIgnoredSubjectLeaks(next, ignoredLabels, keptLabel);
+      if (leakCheck.hasLeaks) {
+        setSoloRewriteWarning(
+          `Selection contains ${leakCheck.leaks.length} component(s) with references to ignored subjects (${leakCheck.leaks.map((l) => l.label).join(', ')}). Click "Rewrite for Solo" to sanitize.`
+        );
+      }
     }
   };
 
@@ -845,24 +1193,84 @@ export default function App() {
     }
   };
 
-  // Generate Final Prompt from CURRENT component field contents
+  // Phase 4: Contradiction Check & Final Prompt Builder
+  const buildAndSetFinalPrompt = (workingComponents: Record<ComponentKey, DetectedComponent>) => {
+    let prompt = '';
+    const options = {
+      leadSentence: scannedLeadSentence,
+      styleCategory: scannedStyleCategory,
+      isSoloMode: activeSubjectDecision === 'solo',
+      tickedKeys: tickedComponentKeys,
+      subjects: detectedSubjects,
+      subjectComponents: subjectComponents || undefined,
+      activeSubjectDecision,
+    };
+
+    if (activeTool === 'general_extractor') {
+      prompt = buildGeneralExtractorPrompt(workingComponents, outputRatio, options);
+    } else if (activeTool === 'subject_swapping') {
+      prompt = buildSubjectSwapPrompt(workingComponents, outputRatio);
+    } else if (activeTool === 'camera_controller') {
+      prompt = buildCameraControlPrompt(cameraSettings, workingComponents, outputRatio);
+    }
+
+    const neg = buildNegativePrompt(workingComponents);
+    setGeneratedMasterPrompt(prompt);
+    setGeneratedNegativePrompt(neg);
+    setHasUnbuiltChanges(false);
+    setIsContradictionModalOpen(false);
+  };
+
   const handleGenerateFinalPrompt = () => {
     if (!components) return;
     triggerHaptic();
 
-    let prompt = '';
-    if (activeTool === 'general_extractor') {
-      prompt = buildGeneralExtractorPrompt(components, outputRatio);
-    } else if (activeTool === 'subject_swapping') {
-      prompt = buildSubjectSwapPrompt(components, outputRatio);
-    } else if (activeTool === 'camera_controller') {
-      prompt = buildCameraControlPrompt(cameraSettings, components, outputRatio);
+    // Leak Guard check in solo mode
+    if (activeSubjectDecision === 'solo') {
+      const keptSubjId = selectedSubjectIds[0] || 'A';
+      const keptSubj = detectedSubjects.find((s) => s.id === keptSubjId);
+      const keptLabel = keptSubj ? keptSubj.label : `Subject ${keptSubjId}`;
+      const ignoredSubjs = detectedSubjects.filter((s) => s.id !== keptSubjId);
+      const ignoredLabels = ignoredSubjs.map((s) => s.label);
+
+      const leakCheck = findIgnoredSubjectLeaks(components, ignoredLabels, keptLabel);
+      if (leakCheck.hasLeaks) {
+        setSoloRewriteWarning(
+          `Prompt blocked: ${leakCheck.leaks.length} component(s) (${leakCheck.leaks.map((l) => l.label).join(', ')}) contain references to ignored subjects. Click "Rewrite for Solo" to sanitize.`
+        );
+        return;
+      }
     }
 
-    const neg = buildNegativePrompt(components);
-    setGeneratedMasterPrompt(prompt);
-    setGeneratedNegativePrompt(neg);
-    setHasUnbuiltChanges(false);
+    // Perform deterministic contradiction check
+    const issues = checkPromptContradictions(components, outputRatio, tickedComponentKeys);
+    if (issues.length > 0) {
+      setContradictionIssues(issues);
+      setIsContradictionModalOpen(true);
+      return;
+    }
+
+    buildAndSetFinalPrompt(components);
+  };
+
+  const handleDeepAiCheck = async () => {
+    if (!generatedMasterPrompt) return;
+    setIsPerformingDeepCheck(true);
+    try {
+      const customKey = StorageService.getCustomApiKey();
+      const res = await postApiJson<{ success: boolean; check: { hasIssues: boolean; issues: ContradictionIssue[] } }>(
+        '/api/check-prompt',
+        { promptText: generatedMasterPrompt },
+        { customKey }
+      );
+      if (res.check?.issues?.length) {
+        setContradictionIssues((prev) => [...prev, ...res.check.issues]);
+      }
+    } catch (err) {
+      console.warn('Deep AI Check notice:', err);
+    } finally {
+      setIsPerformingDeepCheck(false);
+    }
   };
 
   const exportedPrompt = generatedMasterPrompt
@@ -1793,6 +2201,36 @@ export default function App() {
                 {/* ANALYSIS RESULTS & 13-COMPONENT COLLAPSIBLE ACCORDION GROUPS */}
                 {components && !isScanning && (
                   <div className="space-y-6 pt-4 border-t border-white/[0.08] animate-in fade-in duration-300">
+                    {/* Solo Mode Leak Warning & One-Tap Rewrite Action */}
+                    {soloRewriteWarning && (
+                      <div className="p-4 rounded-2xl bg-amber-950/60 border border-amber-500/60 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-bold text-amber-300 text-sm">
+                              Solo Mode Field Alignment Notice
+                            </div>
+                            <p className="text-zinc-300 text-xs mt-0.5 leading-relaxed">
+                              {soloRewriteWarning}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRewriteFieldsSolo}
+                          disabled={isRewritingFields}
+                          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+                        >
+                          {isRewritingFields ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-black" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 text-black" />
+                          )}
+                          <span>Rewrite for Solo</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* Results Top Header Bar */}
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 glass-panel p-4 sm:p-5 rounded-2xl">
                       <div className="space-y-1">
@@ -1821,6 +2259,26 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
+                        {detectedSubjects.length >= 2 && (
+                          <button
+                            type="button"
+                            onClick={() => setIsMultiSubjectModalOpen(true)}
+                            className="min-h-[36px] px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Users className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Change decision ({activeSubjectDecision === 'solo' ? 'Solo' : 'All'})</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setIsChecklistStepOpen(true)}
+                          className="min-h-[36px] px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30 transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <ListChecks className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Edit selection ({tickedComponentKeys.length}/13)</span>
+                        </button>
+
                         <button
                           type="button"
                           onClick={handleRestoreAllOriginal}
@@ -2357,6 +2815,332 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Quota Fallback Persistent Amber Banner */}
+      {isQuotaFallback && !quotaFallbackAcknowledged && (
+        <div className="mb-4 p-4 rounded-2xl bg-amber-950/50 border border-amber-500/50 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-bold text-amber-300 text-sm">
+                Estimated blueprint, not an AI analysis
+              </div>
+              <p className="text-zinc-300 text-xs mt-0.5 leading-relaxed">
+                Your AI service quota has been reached. A template blueprint was initialized based on reference image geometry. You may edit any field or acknowledge to continue.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setQuotaFallbackAcknowledged(true)}
+            className="px-4 py-2 rounded-xl bg-amber-500 text-black font-bold text-xs hover:bg-amber-400 transition shrink-0 cursor-pointer"
+          >
+            Acknowledge & Continue
+          </button>
+        </div>
+      )}
+
+      {/* PHASE 2: Multi-Subject Decision Modal */}
+      <AnimatePresence>
+        {isMultiSubjectModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-lg bg-[#0e1017] border border-white/15 rounded-2xl p-6 shadow-2xl space-y-5"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-lg text-white">
+                      Multiple Subjects Detected ({detectedSubjects.length})
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Choose how to structure the prompt blueprint:
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMultiSubjectModalOpen(false)}
+                  className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleConsiderAllSubjects}
+                  className="w-full p-4 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/10 hover:from-amber-500/30 hover:to-amber-600/20 border border-amber-500/40 text-left transition space-y-1 group"
+                >
+                  <div className="flex items-center justify-between font-bold text-sm text-amber-300">
+                    <span>Consider all subjects in scene</span>
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/30">
+                      Multi-Subject Mode
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Analyzes interactions, positional layout, and keep descriptions for all detected individuals.
+                  </p>
+                </button>
+
+                <div className="text-xs font-semibold text-zinc-400 pt-1">
+                  Or isolate a single subject (Solo Mode):
+                </div>
+
+                {detectedSubjects.map((subject) => (
+                  <button
+                    key={subject.id}
+                    type="button"
+                    onClick={() => handleSelectSoloSubject(subject.id)}
+                    className="w-full p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center font-bold text-xs text-amber-400 border border-white/10">
+                        {subject.id}
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-white">{subject.label}</div>
+                        <div className="text-[11px] text-zinc-400 capitalize">{subject.prominence} subject</div>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-[#f5c518] group-hover:translate-x-0.5 transition-transform">
+                      Keep only Subject {subject.id} &rarr;
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* PHASE 3: Tick-box Component Selection Checklist Step */}
+      <AnimatePresence>
+        {isChecklistStepOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="w-full max-w-2xl max-h-[85vh] bg-[#0e1017] border border-white/15 rounded-2xl p-6 shadow-2xl flex flex-col space-y-4"
+            >
+              <div className="flex items-start justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-400">
+                    <ListChecks className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-lg text-white">
+                      Visible & Relevant Component Selection
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Select which extracted components to include in your prompt:
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTickedComponentKeys([...ALL_COMPONENT_KEYS])}
+                    className="px-2.5 py-1 text-xs text-indigo-300 hover:text-white bg-indigo-500/20 rounded-lg transition"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTickedComponentKeys([])}
+                    className="px-2.5 py-1 text-xs text-zinc-400 hover:text-white bg-white/5 rounded-lg transition"
+                  >
+                    Select None
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsChecklistStepOpen(false)}
+                    className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {ALL_COMPONENT_KEYS.map((key) => {
+                  const item = components?.[key];
+                  const isUnavailable = item?.state === 'unavailable' || item?.visibility === 'unavailable';
+                  const isPartial = item?.visibility === 'partial';
+                  const isChecked = tickedComponentKeys.includes(key);
+
+                  if (isUnavailable) return null;
+
+                  return (
+                    <label
+                      key={key}
+                      className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${
+                        isChecked
+                          ? 'bg-indigo-950/30 border-indigo-500/40'
+                          : 'bg-white/[0.02] border-white/10 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleChecklistKey(key)}
+                        className="mt-1 accent-indigo-500 w-4 h-4 rounded cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-xs text-white">
+                            {COMPONENT_LABELS[key]}
+                          </span>
+                          {isPartial && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              Partial visibility
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-400 line-clamp-2 mt-0.5">
+                          {item?.userText || item?.detectedText || 'No description extracted.'}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {components && (
+                <div className="text-xs text-zinc-500 font-mono pt-2 border-t border-white/10 flex items-center justify-between">
+                  <span>
+                    {ALL_COMPONENT_KEYS.filter((k) => components[k]?.state === 'unavailable').length} components not visible in this frame (excluded from checklist)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleFinishChecklist}
+                    className="px-5 py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer"
+                  >
+                    Continue with Selected Components
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* PHASE 4: Contradiction Check Modal */}
+      <AnimatePresence>
+        {isContradictionModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-xl bg-[#0e1017] border border-white/15 rounded-2xl p-6 shadow-2xl space-y-4"
+            >
+              <div className="flex items-start justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-lg text-white">
+                      Potential Prompt Contradictions
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Review detected conflicts before generating your prompt:
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsContradictionModalOpen(false)}
+                  className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {contradictionIssues.map((issue) => (
+                  <div key={issue.id} className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-300">
+                      <span>{issue.labelA} vs {issue.labelB}</span>
+                      <span className="font-mono text-[10px] text-amber-400/80">Conflict</span>
+                    </div>
+                    <p className="text-xs text-zinc-300">{issue.explanation}</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (components && issue.fieldB) {
+                            handleUpdateComponentState(issue.fieldB as ComponentKey, 'ignored');
+                          }
+                          setContradictionIssues((prev) => prev.filter((i) => i.id !== issue.id));
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40"
+                      >
+                        Keep {issue.labelA} (Exclude {issue.labelB})
+                      </button>
+                      {issue.fieldA && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (components) {
+                              handleUpdateComponentState(issue.fieldA as ComponentKey, 'ignored');
+                            }
+                            setContradictionIssues((prev) => prev.filter((i) => i.id !== issue.id));
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40"
+                        >
+                          Keep {issue.labelB} (Exclude {issue.labelA})
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleDeepAiCheck}
+                  disabled={isPerformingDeepCheck}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isPerformingDeepCheck ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#f5c518]" /> : <Sparkles className="w-3.5 h-3.5 text-[#f5c518]" />}
+                  <span>Deep AI Check</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsContradictionModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-semibold text-xs"
+                  >
+                    Edit Fields
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsContradictionModalOpen(false);
+                      if (components) buildAndSetFinalPrompt(components);
+                    }}
+                    className="px-5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer"
+                  >
+                    Proceed Anyway & Generate
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <OfflineIndicator />
     </>

@@ -15,6 +15,8 @@ import {
   CameraExtractedComponent,
   CameraReferenceAnalysisState,
   GazeBehaviorType,
+  SubjectData,
+  COMPONENT_LABELS,
 } from '../types';
 
 export const FIXED_REFERENCE_TAIL = 'inspired from input reference image';
@@ -130,25 +132,214 @@ export function resolveActiveComponentContent(comp: DetectedComponent | undefine
   return val;
 }
 
+export interface GeneralPromptOptions {
+  leadSentence?: string;
+  styleCategory?: 'photorealistic' | 'illustration' | '3D' | 'painting';
+  isSoloMode?: boolean;
+  tickedKeys?: ComponentKey[];
+  subjects?: SubjectData[];
+  subjectComponents?: Record<string, Record<ComponentKey, DetectedComponent>>;
+  activeSubjectDecision?: 'all' | 'solo';
+}
+
+/**
+ * Builds the mandatory prompt opener starting with:
+ * "Generate a photorealistic image of ..." (or "Generate an image of ..." for illustration/3D/painting).
+ * Uses scan leadSentence or rebuilds it locally from active subject, pose, environment, and camera fields.
+ */
+export function buildPromptOpener(
+  components: Partial<Record<ComponentKey, DetectedComponent>>,
+  options?: GeneralPromptOptions
+): string {
+  const isNonPhoto =
+    options?.styleCategory === 'illustration' ||
+    options?.styleCategory === '3D' ||
+    options?.styleCategory === 'painting';
+  const prefix = isNonPhoto ? 'Generate an image of ' : 'Generate a photorealistic image of ';
+
+  let coreDescription = (options?.leadSentence || '').trim();
+
+  // Strip generic phrases and dedupe solo marker
+  coreDescription = coreDescription
+    .replace(/^a\s+single\s+person\s+in\s+a\s+photorealistic\s+scene\.?/i, '')
+    .replace(/^single\s+person\s+in\s+a\s+photorealistic\s+scene\.?/i, '')
+    .replace(/No other person is present in the frame\.?/gi, '')
+    .trim();
+
+  const subjectComp = components.subject;
+  const poseComp = components.pose;
+  const envComp = components.environment;
+
+  const isEditedOrIgnored =
+    !coreDescription ||
+    subjectComp?.state === 'edited' ||
+    subjectComp?.state === 'ignored' ||
+    poseComp?.state === 'edited' ||
+    poseComp?.state === 'ignored' ||
+    envComp?.state === 'edited' ||
+    envComp?.state === 'ignored';
+
+  if (isEditedOrIgnored || !coreDescription) {
+    const subjectText = resolveActiveComponentContent(subjectComp);
+    const poseText = resolveActiveComponentContent(poseComp);
+    const envText = resolveActiveComponentContent(envComp);
+
+    const cleanSubj = subjectText
+      ? subjectText.replace(/\.$/, '').replace(/^subject\s+[a-z0-9]+:\s*/i, '').trim()
+      : 'a person';
+    const cleanPose = poseText
+      ? poseText.replace(/\.$/, '').replace(/^subject\s+[a-z0-9]+:\s*/i, '').trim()
+      : '';
+    const cleanEnv = envText
+      ? envText.replace(/\.$/, '').trim()
+      : '';
+
+    const parts: string[] = [];
+    if (cleanSubj) parts.push(cleanSubj);
+    if (cleanPose) parts.push(cleanPose);
+    if (cleanEnv) {
+      if (cleanEnv.toLowerCase().startsWith('in ') || cleanEnv.toLowerCase().startsWith('at ')) {
+        parts.push(cleanEnv);
+      } else {
+        parts.push(`in ${cleanEnv}`);
+      }
+    }
+
+    coreDescription = parts.join(', ');
+  }
+
+  let cleanCore = coreDescription
+    .replace(/^Generate\s+(a|an)\s+(photorealistic\s+)?image\s+of\s+/i, '')
+    .replace(/^photorealistic\s+/i, '')
+    .trim();
+
+  // Ensure initial article is lowercased
+  if (/^(a|an)\b/i.test(cleanCore)) {
+    cleanCore = cleanCore.replace(/^(a|an)\b/i, (m) => m.toLowerCase());
+  } else if (cleanCore) {
+    const firstWord = cleanCore.split(/\s+/)[0].toLowerCase();
+    const startsWithVowel = /^[aeiou]/i.test(firstWord);
+    cleanCore = `${startsWithVowel ? 'an' : 'a'} ${cleanCore}`;
+  }
+
+  cleanCore = cleanCore.replace(/\.+$/, '').trim() + '.';
+
+  let opener = `${prefix}${cleanCore}`;
+
+  if (!isNonPhoto) {
+    opener = opener.replace(/photorealistic image of (a|an) photorealistic/i, 'photorealistic image of $1');
+  }
+
+  if (options?.isSoloMode || options?.activeSubjectDecision === 'solo') {
+    opener += ' No other person is present in the frame.';
+  }
+
+  return opener;
+}
+
 /**
  * Generates the final prompt for the General Prompt Extractor (Tool 1).
- * Strictly follows the current contents of all 13 component fields.
- * Never restores removed, ignored, or unavailable details from the original scan.
+ * Always starts with "Generate a photorealistic image of ..." / "Generate an image of ...".
+ * Strictly honors ticked, active, and edited component states.
+ * Ignored, unticked, and unavailable components never appear.
  */
 export function buildGeneralExtractorPrompt(
   components: Record<ComponentKey, DetectedComponent>,
-  outputRatio: string
+  outputRatio: string,
+  options?: GeneralPromptOptions
 ): string {
+  const isSolo = options?.isSoloMode || options?.activeSubjectDecision === 'solo';
+  const opener = buildPromptOpener(components, options);
   const sections: { title: string; content: string }[] = [];
 
-  for (const item of COMPONENT_DISPLAY_ORDER) {
-    const comp = components[item.key];
-    const resolved = resolveActiveComponentContent(comp);
-    if (resolved) {
-      sections.push({
-        title: item.title,
-        content: resolved,
-      });
+  const isTicked = (k: ComponentKey): boolean => {
+    if (options?.tickedKeys) {
+      return options.tickedKeys.includes(k);
+    }
+    return true;
+  };
+
+  const sanitizeSoloContent = (text: string): string => {
+    if (!isSolo) return text;
+    let t = text;
+    t = t.replace(/^Subject\s+[a-z0-9]+:\s*/gi, '');
+    t = t.replace(/No other person is present in the frame\.?/gi, '');
+    return t.trim();
+  };
+
+  // If multi-subject decision is "all" and subjectComponents are provided
+  if (
+    options?.activeSubjectDecision === 'all' &&
+    options?.subjects &&
+    options.subjects.length >= 2 &&
+    options.subjectComponents
+  ) {
+    for (const subj of options.subjects) {
+      const subjComps = options.subjectComponents[subj.id];
+      if (!subjComps) continue;
+
+      const personKeys: ComponentKey[] = [
+        'subject',
+        'body',
+        'pose',
+        'facial_expression',
+        'hand_gestures',
+        'leg_gestures',
+        'clothing',
+      ];
+
+      for (const key of personKeys) {
+        if (!isTicked(key)) continue;
+        const comp = subjComps[key];
+        const resolved = resolveActiveComponentContent(comp);
+        if (resolved) {
+          const label = COMPONENT_LABELS[key].toUpperCase();
+          sections.push({
+            title: `SUBJECT ${subj.id} - ${label}`,
+            content: resolved,
+          });
+        }
+      }
+    }
+
+    // Shared scene components plus interaction
+    const sceneKeys: ComponentKey[] = [
+      'interaction',
+      'camera',
+      'framing',
+      'lighting',
+      'environment',
+      'background',
+      'composition',
+    ];
+
+    for (const key of sceneKeys) {
+      if (!isTicked(key)) continue;
+      const comp = components[key];
+      const resolved = resolveActiveComponentContent(comp);
+      if (resolved) {
+        sections.push({
+          title: COMPONENT_LABELS[key].toUpperCase(),
+          content: resolved,
+        });
+      }
+    }
+  } else {
+    // Single subject or solo reanalyzed subject
+    for (const item of COMPONENT_DISPLAY_ORDER) {
+      if (item.key === 'interaction') continue; // Only used when 2+ subjects present
+      if (!isTicked(item.key)) continue;
+      const comp = components[item.key];
+      const resolved = resolveActiveComponentContent(comp);
+      if (resolved) {
+        const cleanVal = sanitizeSoloContent(resolved);
+        if (cleanVal) {
+          sections.push({
+            title: item.title,
+            content: cleanVal,
+          });
+        }
+      }
     }
   }
 
@@ -156,8 +347,9 @@ export function buildGeneralExtractorPrompt(
     sections.push({ title: 'ASPECT RATIO & CROP', content: outputRatio.trim() });
   }
 
-  const promptBody = sections.map((s) => `${s.title}:\n${s.content}`).join('\n\n');
-  return sanitizeProductionPrompt(promptBody);
+  const sectionsBody = sections.map((s) => `${s.title}:\n${s.content}`).join('\n\n');
+  const fullPrompt = `${opener}\n\n${sectionsBody}`;
+  return sanitizeProductionPrompt(fullPrompt);
 }
 
 /**

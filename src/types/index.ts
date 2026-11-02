@@ -21,7 +21,8 @@ export type ComponentKey =
   | 'composition'
   | 'facial_expression'
   | 'hand_gestures'
-  | 'leg_gestures';
+  | 'leg_gestures'
+  | 'interaction';
 
 export const ALL_COMPONENT_KEYS: ComponentKey[] = [
   'subject',
@@ -37,6 +38,7 @@ export const ALL_COMPONENT_KEYS: ComponentKey[] = [
   'facial_expression',
   'hand_gestures',
   'leg_gestures',
+  'interaction',
 ];
 
 export const COMPONENT_LABELS: Record<ComponentKey, string> = {
@@ -53,6 +55,7 @@ export const COMPONENT_LABELS: Record<ComponentKey, string> = {
   facial_expression: 'Facial Expression',
   hand_gestures: 'Hand Gestures',
   leg_gestures: 'Leg Gestures',
+  interaction: 'Subject Interaction',
 };
 
 export type ComponentState = 'locked' | 'edited' | 'ignored' | 'unavailable';
@@ -70,6 +73,26 @@ export interface DetectedComponent {
   visibility?: 'visible' | 'partial' | 'unavailable';
   selectedProfileId?: string;
   selectedProfileName?: string;
+  subjectId?: string; // e.g. 'A', 'B' when multi-subject
+  needsSoloRewrite?: boolean;
+}
+
+export interface SubjectData {
+  id: string; // 'A', 'B', etc.
+  label: string;
+  prominence: 'primary' | 'secondary';
+  components?: Partial<Record<ComponentKey, DetectedComponent>>;
+}
+
+export interface ContradictionIssue {
+  id: string;
+  fieldA: ComponentKey | string;
+  fieldB: ComponentKey | string;
+  labelA: string;
+  labelB: string;
+  textA: string;
+  textB: string;
+  explanation: string;
 }
 
 export type ToolType = 'general_extractor' | 'subject_swapping' | 'camera_controller';
@@ -210,12 +233,30 @@ export interface CameraReferenceAnalysisState {
 }
 
 export interface ScanAnalysisResult {
-  components: Record<ComponentKey, DetectedComponent>;
+  leadSentence?: string;
+  styleCategory?: 'photorealistic' | 'illustration' | '3D' | 'painting';
+  summary?: string;
   outputRatio: string;
   ratioExplanation?: string;
-  detectedSummary?: string;
+  subjects?: SubjectData[];
   cameraEstimates?: Partial<CameraControlSettings>;
+  components: Record<ComponentKey, DetectedComponent>;
+  subjectComponents?: Record<string, Record<ComponentKey, DetectedComponent>>;
+  personComponents?: Record<string, Partial<Record<ComponentKey, DetectedComponent>>>;
+  sceneComponents?: Partial<Record<ComponentKey, DetectedComponent>>;
+  multiSubjectSnapshot?: {
+    components: Record<ComponentKey, DetectedComponent>;
+    originalComponents: Record<ComponentKey, DetectedComponent>;
+    subjects: SubjectData[];
+    personComponents?: Record<string, Partial<Record<ComponentKey, DetectedComponent>>>;
+    sceneComponents?: Partial<Record<ComponentKey, DetectedComponent>>;
+  };
   rawResponse?: string;
+  modelUsed?: string;
+  switchedToBackup?: boolean;
+  quotaFallback?: boolean;
+  warning?: string;
+  schemaVersion?: number;
 }
 
 export interface SubjectProfile {
@@ -290,6 +331,7 @@ export interface ReferenceBlueprint {
   title: string;
   createdAt: number;
   updatedAt: number;
+  schemaVersion?: number;
   toolType?: ToolType;
   referenceThumbnails: string[];
   referenceImageIds?: string[]; // IndexedDB image keys
@@ -301,6 +343,20 @@ export interface ReferenceBlueprint {
   backgroundProfileId?: string;
   promptMode?: PromptMode;
   authorityMap?: ComponentAuthorityMap;
+  subjects?: SubjectData[];
+  subjectComponents?: Record<string, Record<ComponentKey, DetectedComponent>>;
+  personComponents?: Record<string, Partial<Record<ComponentKey, DetectedComponent>>>;
+  sceneComponents?: Partial<Record<ComponentKey, DetectedComponent>>;
+  multiSubjectSnapshot?: {
+    components: Record<ComponentKey, DetectedComponent>;
+    originalComponents: Record<ComponentKey, DetectedComponent>;
+    subjects: SubjectData[];
+    personComponents?: Record<string, Partial<Record<ComponentKey, DetectedComponent>>>;
+    sceneComponents?: Partial<Record<ComponentKey, DetectedComponent>>;
+  };
+  activeSubjectDecision?: 'all' | 'solo';
+  selectedSubjectIds?: string[];
+  tickedComponentKeys?: string[];
   originalComponents?: Record<ComponentKey, DetectedComponent>; // Immutable snapshot of original scan
   components: Record<ComponentKey, DetectedComponent>; // Current working state with user modifications
   cameraSettings?: CameraControlSettings;

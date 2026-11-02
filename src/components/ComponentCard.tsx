@@ -177,7 +177,9 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
             </span>
             <span
               className={`text-[11px] font-medium ${
-                state === 'unavailable' || isUnavailable
+                component.needsSoloRewrite
+                  ? 'text-amber-400 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30'
+                  : state === 'unavailable' || isUnavailable
                   ? 'text-amber-400/90'
                   : state === 'ignored' || isEmpty
                   ? 'text-red-400/90'
@@ -186,7 +188,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                   : 'text-zinc-400'
               }`}
             >
-              {getStatusText()}
+              {component.needsSoloRewrite ? 'Needs Solo Rewrite' : getStatusText()}
             </span>
           </div>
 
@@ -281,7 +283,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
       {!isExpanded && (
         <div
           onClick={() => setIsExpanded(true)}
-          className="px-4 pb-3 pt-0 text-xs text-zinc-400 line-clamp-2 cursor-pointer leading-relaxed"
+          className="px-4 pb-3 pt-0 text-xs text-zinc-400 line-clamp-3 cursor-pointer leading-relaxed"
         >
           {isUnavailable ? (
             <span className="italic text-zinc-500 flex items-center gap-1.5">
@@ -600,9 +602,16 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-zinc-200 leading-relaxed font-sans select-text whitespace-pre-wrap">
-                  {activeText}
-                </p>
+                <div className="space-y-1.5">
+                  <p className="text-xs text-zinc-200 leading-relaxed font-sans select-text whitespace-pre-wrap">
+                    {activeText}
+                  </p>
+                  {component.explanation && (
+                    <p className="text-[11px] text-zinc-500 italic">
+                      <span className="font-semibold text-zinc-400 not-italic">Evidence:</span> {component.explanation}
+                    </p>
+                  )}
+                </div>
               )}
 
               {/* Bottom Action Bar */}

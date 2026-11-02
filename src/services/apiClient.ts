@@ -258,14 +258,9 @@ export async function postApiJson<T = any>(
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err?.name === 'AbortError') {
-        lastError = new Error(
+        throw new Error(
           'Analysis timed out. Please try again with a standard resolution image.'
         );
-        if (attempt < maxRetries) {
-          await sleep(500);
-          continue;
-        }
-        throw lastError;
       }
 
       const rawMessage = extractApiErrorMessage(
