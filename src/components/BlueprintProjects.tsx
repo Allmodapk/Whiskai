@@ -24,6 +24,7 @@ const TOOL_LABELS: Record<ToolType, string> = {
   general_extractor: 'General Prompt Extractor',
   subject_swapping: 'Subject Swapping',
   camera_controller: 'Camera Angle Controller',
+  camera_ai: 'Camera AI',
 };
 
 export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlueprint }) => {

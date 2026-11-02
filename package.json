@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx src/services/__tests__/scanQualityAndPrompt.test.ts && tsx src/services/__tests__/cameraPlayboardPrompts.test.ts && tsx src/services/__tests__/swapStudio.test.ts"
+    "test": "tsx src/services/__tests__/scanQualityAndPrompt.test.ts && tsx src/services/__tests__/cameraPlayboardPrompts.test.ts && tsx src/services/__tests__/swapStudio.test.ts && tsx src/services/__tests__/cameraAi.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.32.0",

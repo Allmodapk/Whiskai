@@ -222,7 +222,12 @@ export const StorageService = {
   getActiveTool(): ToolType {
     try {
       const val = localStorage.getItem(STORAGE_KEYS.ACTIVE_TOOL) as ToolType;
-      if (val === 'general_extractor' || val === 'subject_swapping' || val === 'camera_controller') {
+      if (
+        val === 'general_extractor' ||
+        val === 'subject_swapping' ||
+        val === 'camera_controller' ||
+        val === 'camera_ai'
+      ) {
         return val;
       }
       return 'general_extractor';

@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import type { CameraAiTemplateAnalysis, CameraAiBaseAnalysis } from './src/types/index.js';
 
 dotenv.config();
 
@@ -1982,7 +1983,471 @@ Return VALID, PURE JSON matching this exact schema:
   }
 });
 
-// Prevent any unmatched /api/* route from falling through to Vite SPA HTML middleware
+// ============================================================================
+// CAMERA AI ENDPOINTS (/api/camera-ai/analyze-template & /api/camera-ai/analyze-base)
+// ============================================================================
+
+function buildCameraAiTemplateQuotaFallback(base64Data?: string): CameraAiTemplateAnalysis {
+  const geom = extractImageGeometryFromBase64(base64Data);
+  return {
+    evidence: {
+      horizon_visible: 'Upper third of frame or above frame edge',
+      vanishing_points: 'Parallel perspective lines converge naturally toward the center depth',
+      vertical_lines_convergence: 'Slight vertical convergence towards eye-level horizon',
+      ground_floor_visibility: 'Covers approximately 45–60% of vertical frame area',
+      ceiling_visibility: 'Not visible in default crop',
+      top_vs_side_surfaces: 'Side surfaces and front plane dominate subject elevation',
+      foreshortening: 'Natural normal-lens perspective without extreme foreshortening',
+      shadow_direction_length: 'Soft directional shadows cast slightly behind subjects',
+      perspective_strength: 'Standard 50mm optical compression',
+      edge_distortion: 'Negligible optical barrel/pincushion distortion',
+      background_compression: 'Balanced spatial separation between subject and background',
+      depth_of_field_bokeh: 'Medium depth of field with gentle background bokeh',
+      tilt_roll: 'Level horizon, 0° roll angle',
+      crop_margins: `Standard ${geom.outputRatio} ${geom.orientation.toLowerCase()} framing`,
+    },
+    estimates: {
+      pitch_deg: -5,
+      pitch_range: [-15, 5],
+      pitch_confidence: 0.85,
+      pitch_label: 'level / eye-level',
+      camera_height: 'eye level',
+      camera_height_meters: 1.6,
+      camera_height_confidence: 0.85,
+      azimuth_deg: 0,
+      azimuth_range: [-15, 15],
+      azimuth_confidence: 0.85,
+      azimuth_reference_axis: 'Subject facing direction',
+      distance_label: 'medium',
+      distance_meters: 2.5,
+      distance_confidence: 0.85,
+      perspective_strength_rating: 'Standard normal lens perspective',
+      focal_length_mm: 50,
+      focal_length_range: [35, 70],
+      focal_length_label: 'normal',
+      focal_length_confidence: 0.85,
+      distortion_character: 'Minimal distortion',
+      roll_deg: 0,
+      roll_confidence: 0.95,
+      shot_size: geom.orientation === 'Portrait' ? 'full' : 'medium',
+      framing: {
+        aspect_ratio: geom.outputRatio,
+        orientation: geom.orientation,
+        subject_position_in_frame: 'Center cell',
+        headroom: '15% vertical headroom',
+        lead_room: 'Centered lead room',
+        negative_space: 'Balanced lateral margins',
+        crop_behavior: 'Clean non-cutting frame edges',
+      },
+      depth_of_field: {
+        dof_type: 'medium',
+        focus_plane_position: 'Focused on principal subject plane',
+      },
+      camera_position_summary: `Eye-level camera positioned 2.5m directly in front of the subject at 1.6m height with a 50mm normal lens in a ${geom.outputRatio} ${geom.orientation.toLowerCase()} frame.`,
+    },
+    visual_consequences: [
+      'Ground plane is visible across lower half of frame',
+      'Vertical lines remain aligned perpendicular to level horizon',
+      'Subject proportions maintain natural 1:1 anatomical scale without top-down foreshortening',
+    ],
+    consistency_check: {
+      verified: true,
+      reasoning: 'Eye-level pitch (-5°) is consistent with visible horizon in upper third.',
+      warnings: [],
+    },
+  };
+}
+
+function buildCameraAiBaseQuotaFallback(base64Data?: string): CameraAiBaseAnalysis {
+  const tempFallback = buildCameraAiTemplateQuotaFallback(base64Data);
+  return {
+    subject_type_and_count: 'Single human subject',
+    pose: 'Standing upright in a relaxed stance with weight evenly distributed and arms hanging naturally',
+    head_orientation: 'Head turned forward toward the camera lens',
+    gaze_direction: 'Looking directly into Camera B lens at eye level',
+    clothing_details: 'Well-fitted contemporary wardrobe with natural fabric texture',
+    environment_and_background: 'Clean interior studio space with subtle ambient background details',
+    lighting_details: 'Soft directional key lighting from front-left with gentle fill and realistic shadows',
+    current_camera: tempFallback.estimates,
+    must_not_change: [
+      'Subject identity and facial features',
+      'Standing pose and limb arrangement',
+      'Direct gaze toward original Camera B',
+      'Clothing design and fabric texture',
+      'Lighting direction and ambient color temperature',
+    ],
+    geometry_risks: [
+      'Top of head and shoulders will need foreshortened rendering from elevated angles',
+      'Back of subject is occluded in original base image and must be synthesized if camera orbits behind',
+    ],
+  };
+}
+
+async function generateCameraAiWithFallback(
+  aiOrKey: GoogleGenAI | string | undefined,
+  parts: any[],
+  customKey?: string
+): Promise<{
+  text: string;
+  parsed?: any;
+  modelUsed: string;
+  switchedToBackup: boolean;
+  finishReason: string;
+}> {
+  const isQuotaOrRateLimit = (err: any): boolean => {
+    const status = err?.status || err?.statusCode || err?.code;
+    if (status === 429 || status === '429') return true;
+    const msg = String(err?.message || '').toLowerCase();
+    return (
+      msg.includes('429') ||
+      msg.includes('quota') ||
+      msg.includes('resource_exhausted') ||
+      msg.includes('rate limit')
+    );
+  };
+
+  const candidateKeys = getCandidateGeminiApiKeys(
+    typeof aiOrKey === 'string' ? aiOrKey : customKey
+  );
+  const clients: GoogleGenAI[] =
+    candidateKeys.length > 0
+      ? candidateKeys.map((k) => createGenAIClientForKey(k))
+      : aiOrKey && typeof aiOrKey === 'object'
+      ? [aiOrKey]
+      : [getGenAIClient(customKey)];
+
+  const fallbackModels: Array<{
+    name: string;
+    timeoutMs: number;
+    thinkingLevel?: ThinkingLevel;
+  }> = [
+    { name: 'gemini-3.8-flash', timeoutMs: 38000, thinkingLevel: ThinkingLevel.HIGH },
+    { name: 'gemini-3.1-flash-lite', timeoutMs: 35000, thinkingLevel: ThinkingLevel.HIGH },
+    { name: 'gemini-flash-latest', timeoutMs: 30000 },
+  ];
+
+  const startTime = Date.now();
+  const MAX_TOTAL_BUDGET_MS = 40000;
+
+  let lastError: any = null;
+  let modelUsed = fallbackModels[0].name;
+  let switchedToBackup = false;
+
+  for (let clientIdx = 0; clientIdx < clients.length; clientIdx++) {
+    const client = clients[clientIdx];
+    if (clientIdx > 0) switchedToBackup = true;
+
+    for (let modelIdx = 0; modelIdx < fallbackModels.length; modelIdx++) {
+      const elapsed = Date.now() - startTime;
+      const remainingBudget = MAX_TOTAL_BUDGET_MS - elapsed;
+      if (remainingBudget < 3000) break;
+
+      const modelConfig = fallbackModels[modelIdx];
+      modelUsed = modelConfig.name;
+      if (modelIdx > 0) switchedToBackup = true;
+
+      try {
+        const config: Record<string, any> = {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
+        };
+        if (modelConfig.thinkingLevel !== undefined) {
+          config.thinkingConfig = { thinkingLevel: modelConfig.thinkingLevel };
+        }
+
+        const effectiveTimeout = Math.min(modelConfig.timeoutMs, remainingBudget);
+        const response = await withTimeout(
+          client.models.generateContent({
+            model: modelConfig.name,
+            contents: { parts },
+            config,
+          }),
+          effectiveTimeout,
+          modelConfig.name
+        );
+
+        const finishReason = String(response.candidates?.[0]?.finishReason || 'STOP');
+        const txt = (response.text || '').trim();
+        if (!txt) throw new Error('Empty response from model');
+
+        const meta = parseModelJsonWithMeta(txt);
+        return {
+          text: txt,
+          parsed: meta.parsed,
+          modelUsed,
+          switchedToBackup,
+          finishReason,
+        };
+      } catch (err: any) {
+        lastError = err;
+        if (isQuotaOrRateLimit(err)) continue;
+      }
+    }
+  }
+
+  throw lastError || new Error('No response returned from Camera AI analysis.');
+}
+
+app.post('/api/camera-ai/analyze-template', async (req, res) => {
+  try {
+    const customKey = (req.headers['x-gemini-key'] as string) || req.body?.customKey;
+    const apiKey = resolveServerGeminiApiKey(customKey);
+    const ai = apiKey ? createGenAIClientForKey(apiKey) : getGenAIClient();
+
+    const imageData = req.body?.image?.data;
+    const mimeType = req.body?.image?.mimeType || 'image/jpeg';
+
+    if (!imageData) {
+      return res.status(400).json({ error: 'Missing image data for template camera analysis.' });
+    }
+
+    const imagePart = {
+      inlineData: {
+        data: imageData,
+        mimeType,
+      },
+    };
+
+    const promptText = `You are an expert photogrammetry and cinematography analyst for My Whisk AI.
+Analyze the uploaded TEMPLATE image purely for its CAMERA GEOMETRY, POSITION, and OPTICS.
+Subject identity, subject type, clothing, mood, color grade, and scene content are completely IRRELEVANT and must be IGNORED.
+(A bicycle from above, an empty bedroom from above, or a cat at floor level must all yield precise camera parameters).
+
+Methodology: EVIDENCE FIRST, CONCLUSIONS SECOND.
+
+Return PURE JSON matching this structure:
+{
+  "evidence": {
+    "horizon_visible": "...",
+    "vanishing_points": "...",
+    "vertical_lines_convergence": "...",
+    "ground_floor_visibility": "...",
+    "ceiling_visibility": "...",
+    "top_vs_side_surfaces": "...",
+    "foreshortening": "...",
+    "shadow_direction_length": "...",
+    "perspective_strength": "...",
+    "edge_distortion": "...",
+    "background_compression": "...",
+    "depth_of_field_bokeh": "...",
+    "tilt_roll": "...",
+    "crop_margins": "..."
+  },
+  "estimates": {
+    "pitch_deg": -75,
+    "pitch_range": [-85, -65],
+    "pitch_confidence": 0.9,
+    "pitch_label": "top-down",
+    "camera_height": "overhead",
+    "camera_height_meters": 2.8,
+    "camera_height_confidence": 0.85,
+    "azimuth_deg": 0,
+    "azimuth_range": [-15, 15],
+    "azimuth_confidence": 0.8,
+    "azimuth_reference_axis": "Subject facing direction",
+    "distance_label": "medium",
+    "distance_meters": 2.8,
+    "distance_confidence": 0.85,
+    "perspective_strength_rating": "Mild wide-angle expansion",
+    "focal_length_mm": 35,
+    "focal_length_range": [28, 50],
+    "focal_length_label": "wide",
+    "focal_length_confidence": 0.85,
+    "distortion_character": "Slight edge barrel distortion",
+    "roll_deg": 0,
+    "roll_confidence": 0.95,
+    "shot_size": "full",
+    "framing": {
+      "aspect_ratio": "3:4",
+      "orientation": "Portrait",
+      "subject_position_in_frame": "Center cell",
+      "headroom": "15% headroom",
+      "lead_room": "Centered",
+      "negative_space": "Balanced floor space",
+      "crop_behavior": "Full-figure framed within floor boundaries"
+    },
+    "depth_of_field": {
+      "dof_type": "medium",
+      "focus_plane_position": "Focused on floor and subject plane"
+    },
+    "camera_position_summary": "Elevated camera positioned 2.8m directly above the subject pointing steeply down at a -75° pitch."
+  },
+  "visual_consequences": [
+    "Floor plane occupies the majority of the frame",
+    "Tops of head, shoulders, and horizontal surfaces are prominent",
+    "Vertical lines converge sharply downward toward feet"
+  ],
+  "consistency_check": {
+    "verified": true,
+    "reasoning": "Top-down pitch (-75°) matches non-visible horizon and floor area dominance.",
+    "warnings": []
+  }
+}`;
+
+    const parts = [{ text: promptText }, imagePart];
+    const { parsed, modelUsed, switchedToBackup } = await generateCameraAiWithFallback(
+      ai,
+      parts,
+      customKey
+    );
+
+    res.json({
+      success: true,
+      analysis: parsed,
+      modelUsed,
+      switchedToBackup,
+    });
+  } catch (err: any) {
+    const msg = formatServerErrorMessage(err, 'Failed to analyze template camera geometry.');
+    console.warn('Camera AI template fallback check:', msg);
+
+    if (isQuotaOrServiceUnavailable(err)) {
+      const fallback = buildCameraAiTemplateQuotaFallback(req.body?.image?.data);
+      return res.status(200).json({
+        success: true,
+        analysis: fallback,
+        modelUsed: 'local-optical-blueprint',
+        switchedToBackup: true,
+        quotaFallback: true,
+        warning: 'Live Gemini quota reached; template camera geometry estimated locally.',
+      });
+    }
+
+    const statusCode =
+      typeof err?.status === 'number' && err.status >= 400 && err.status < 600
+        ? err.status
+        : 500;
+    res.status(statusCode).json({
+      error: msg,
+      code: typeof err?.code === 'string' ? err.code : undefined,
+    });
+  }
+});
+
+app.post('/api/camera-ai/analyze-base', async (req, res) => {
+  try {
+    const customKey = (req.headers['x-gemini-key'] as string) || req.body?.customKey;
+    const apiKey = resolveServerGeminiApiKey(customKey);
+    const ai = apiKey ? createGenAIClientForKey(apiKey) : getGenAIClient();
+
+    const imageData = req.body?.image?.data;
+    const mimeType = req.body?.image?.mimeType || 'image/jpeg';
+
+    if (!imageData) {
+      return res.status(400).json({ error: 'Missing image data for base image analysis.' });
+    }
+
+    const imagePart = {
+      inlineData: {
+        data: imageData,
+        mimeType,
+      },
+    };
+
+    const promptText = `You are an expert photographic visual analyst for My Whisk AI.
+Analyze the uploaded BASE image ("Your Image") to extract subject, pose, gaze, clothing, environment, lighting, and its CURRENT camera position (Camera B).
+
+Return PURE JSON matching this structure:
+{
+  "subject_type_and_count": "Single human subject",
+  "pose": "Standing upright with relaxed shoulders and weight balanced on feet",
+  "head_orientation": "Head level, facing forward",
+  "gaze_direction": "Looking directly into Camera B lens at eye level",
+  "clothing_details": "Well-fitted contemporary garment",
+  "environment_and_background": "Indoor room with visible background objects",
+  "lighting_details": "Soft directional key light with gentle fill",
+  "current_camera": {
+    "pitch_deg": 0,
+    "pitch_range": [-5, 5],
+    "pitch_confidence": 0.9,
+    "pitch_label": "level / eye-level",
+    "camera_height": "eye level",
+    "camera_height_meters": 1.6,
+    "camera_height_confidence": 0.9,
+    "azimuth_deg": 0,
+    "azimuth_range": [-10, 10],
+    "azimuth_confidence": 0.9,
+    "azimuth_reference_axis": "Subject facing direction",
+    "distance_label": "medium",
+    "distance_meters": 2.2,
+    "distance_confidence": 0.9,
+    "perspective_strength_rating": "Standard normal lens",
+    "focal_length_mm": 50,
+    "focal_length_range": [45, 55],
+    "focal_length_label": "normal",
+    "focal_length_confidence": 0.9,
+    "distortion_character": "Undistorted natural perspective",
+    "roll_deg": 0,
+    "roll_confidence": 0.95,
+    "shot_size": "full",
+    "framing": {
+      "aspect_ratio": "3:4",
+      "orientation": "Portrait",
+      "subject_position_in_frame": "Center cell",
+      "headroom": "10% headroom",
+      "lead_room": "Centered",
+      "negative_space": "Balanced lateral room",
+      "crop_behavior": "Full body from head to feet"
+    },
+    "depth_of_field": {
+      "dof_type": "medium",
+      "focus_plane_position": "Focused on face and torso"
+    },
+    "camera_position_summary": "Eye-level camera positioned 2.2m directly in front of subject."
+  },
+  "must_not_change": [
+    "Subject identity and facial features",
+    "Standing posture and limb arrangement",
+    "Direct gaze toward original Camera B",
+    "Clothing design and fabric texture",
+    "Lighting direction and ambient color temperature"
+  ],
+  "geometry_risks": [
+    "Back of shoulders and legs occluded in base image",
+    "Ground contact points under shoes partially occluded"
+  ]
+}`;
+
+    const parts = [{ text: promptText }, imagePart];
+    const { parsed, modelUsed, switchedToBackup } = await generateCameraAiWithFallback(
+      ai,
+      parts,
+      customKey
+    );
+
+    res.json({
+      success: true,
+      analysis: parsed,
+      modelUsed,
+      switchedToBackup,
+    });
+  } catch (err: any) {
+    const msg = formatServerErrorMessage(err, 'Failed to analyze base image.');
+    console.warn('Camera AI base fallback check:', msg);
+
+    if (isQuotaOrServiceUnavailable(err)) {
+      const fallback = buildCameraAiBaseQuotaFallback(req.body?.image?.data);
+      return res.status(200).json({
+        success: true,
+        analysis: fallback,
+        modelUsed: 'local-optical-blueprint',
+        switchedToBackup: true,
+        quotaFallback: true,
+        warning: 'Live Gemini quota reached; base image characteristics estimated locally.',
+      });
+    }
+
+    const statusCode =
+      typeof err?.status === 'number' && err.status >= 400 && err.status < 600
+        ? err.status
+        : 500;
+    res.status(statusCode).json({
+      error: msg,
+      code: typeof err?.code === 'string' ? err.code : undefined,
+    });
+  }
+});
 app.use('/api', (req, res) => {
   res.status(404).json({
     error: `API endpoint not found: ${req.method} ${req.originalUrl}`,

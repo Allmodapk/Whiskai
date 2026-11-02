@@ -49,6 +49,7 @@ import { CameraPlayboardStudio } from './components/CameraPlayboardStudio';
 import { ReferenceViewfinder } from './components/ReferenceViewfinder';
 import { FloatingPromptDock } from './components/FloatingPromptDock';
 import { SwapStudio } from './components/SwapStudio';
+import { CameraAI } from './components/CameraAI';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Wrench,
@@ -1945,7 +1946,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {(
                   [
                     {
@@ -1968,6 +1969,13 @@ export default function App() {
                       title: '3. Camera Angle Controller',
                       desc: 'Opens in a dedicated full-screen workspace: 3D playboard for camera & pose simulation (T2I / I2I) and reference extraction.',
                       icon: Camera,
+                    },
+                    {
+                      id: 'camera_ai',
+                      num: '04',
+                      title: '4. Camera AI',
+                      desc: "Extract any image's camera position & lens framing. Re-shoot your own image from that exact position.",
+                      icon: Sliders,
                     },
                   ] as const
                 ).map((tool) => {
@@ -2086,6 +2094,11 @@ export default function App() {
 
             {(activeTool as string) === 'subject_swapping' ? (
               <SwapStudio
+                optimizeImageFile={optimizeImageFile}
+                onOpenProjects={() => setActiveNav('projects')}
+              />
+            ) : (activeTool as string) === 'camera_ai' ? (
+              <CameraAI
                 optimizeImageFile={optimizeImageFile}
                 onOpenProjects={() => setActiveNav('projects')}
               />

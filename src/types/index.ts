@@ -95,7 +95,11 @@ export interface ContradictionIssue {
   explanation: string;
 }
 
-export type ToolType = 'general_extractor' | 'subject_swapping' | 'camera_controller';
+export type ToolType =
+  | 'general_extractor'
+  | 'subject_swapping'
+  | 'camera_controller'
+  | 'camera_ai';
 
 export interface CameraControlSettings {
   viewpoint: string; // e.g., Front-facing view, Three-quarter view, Side profile, Rear view
@@ -376,5 +380,90 @@ export interface PromptSafetyCheck {
     suggestedPhrase: string;
     explanation: string;
   }[];
+}
+
+export interface CameraAiEvidence {
+  horizon_visible: string; // e.g. "Upper third, y = 25% of frame height" or "Above top edge of frame"
+  vanishing_points: string; // parallel line behavior
+  vertical_lines_convergence: string; // e.g. "Converge sharply downward"
+  ground_floor_visibility: string; // e.g. "Covers 75% of total frame area"
+  ceiling_visibility: string; // e.g. "Not visible"
+  top_vs_side_surfaces: string; // e.g. "Tops of head, shoulders, and furniture dominate"
+  foreshortening: string; // e.g. "Extreme head-to-feet foreshortening"
+  shadow_direction_length: string; // e.g. "Short shadows cast directly underneath objects"
+  perspective_strength: string; // e.g. "Wide-angle expansion near bottom edge"
+  edge_distortion: string; // e.g. "Mild barrel distortion at frame perimeter"
+  background_compression: string; // e.g. "Deep spatial expansion, uncompressed"
+  depth_of_field_bokeh: string; // e.g. "Deep focus from foreground floor to background wall"
+  tilt_roll: string; // e.g. "Level horizon, 0° roll"
+  crop_margins: string; // e.g. "Full-body subject framed with 15% headroom"
+}
+
+export interface CameraAiFramingSpec {
+  aspect_ratio: string; // e.g. "3:4"
+  orientation: string; // e.g. "Portrait" | "Landscape" | "Square"
+  subject_position_in_frame: string; // e.g. "Center cell"
+  headroom: string;
+  lead_room: string;
+  negative_space: string;
+  crop_behavior: string;
+}
+
+export interface CameraAiDofSpec {
+  dof_type: string; // e.g. "shallow" | "medium" | "deep"
+  focus_plane_position: string; // e.g. "On principal subject's face"
+}
+
+export interface CameraAiEstimates {
+  pitch_deg: number; // -90 = straight top-down, 0 = level, +90 = straight bottom-up
+  pitch_range: [number, number];
+  pitch_confidence: number; // 0.0 - 1.0
+  pitch_label: string; // "top-down" | "bird's-eye" | "high-angle" | "level / eye-level" | "low-angle" | "worm's-eye"
+  camera_height: string; // "below ground level" | "floor level" | "knee level" | "waist level" | "chest level" | "eye level" | "above head" | "elevated" | "overhead" | "drone-high"
+  camera_height_meters: number;
+  camera_height_confidence: number;
+  azimuth_deg: number; // 0 = front, 90 = subject's left, 180 = behind, -90 = subject's right
+  azimuth_range: [number, number];
+  azimuth_confidence: number;
+  azimuth_reference_axis: string; // e.g. "Subject facing direction" or "Room main axis"
+  distance_label: 'extreme close' | 'close' | 'medium' | 'far' | 'very far';
+  distance_meters: number;
+  distance_confidence: number;
+  perspective_strength_rating: string;
+  focal_length_mm: number;
+  focal_length_range: [number, number];
+  focal_length_label: 'ultra-wide' | 'wide' | 'normal' | 'short tele' | 'tele';
+  focal_length_confidence: number;
+  distortion_character: string;
+  roll_deg: number;
+  roll_confidence: number;
+  shot_size: string; // e.g. "ECU" | "CU" | "medium" | "cowboy" | "full" | "wide"
+  framing: CameraAiFramingSpec;
+  depth_of_field: CameraAiDofSpec;
+  camera_position_summary: string;
+}
+
+export interface CameraAiTemplateAnalysis {
+  evidence: CameraAiEvidence;
+  estimates: CameraAiEstimates;
+  visual_consequences: string[];
+  consistency_check: {
+    verified: boolean;
+    reasoning: string;
+    warnings: string[];
+  };
+}
+
+export interface CameraAiBaseAnalysis {
+  subject_type_and_count: string;
+  pose: string; // limbs, stance, weight distribution
+  head_orientation: string;
+  gaze_direction: string; // e.g. "Looking directly into Camera B lens"
+  clothing_details: string;
+  environment_and_background: string;
+  lighting_details: string;
+  current_camera: CameraAiEstimates;
+  must_not_change: string[];
+  geometry_risks: string[];
 }
 
