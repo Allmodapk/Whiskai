@@ -755,9 +755,34 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
   };
 
   const matchedPresetId = useMemo(() => matchPresetBySwitches(switches), [switches]);
+  const [mobileSection, setMobileSection] = useState<'recipes' | 'images' | 'matrix' | 'output'>('recipes');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Mobile-only 4-Step Section Switcher */}
+      <div className="lg:hidden grid grid-cols-4 gap-1 p-1 rounded-xl bg-[#0e1118] border border-white/[0.09]">
+        {(
+          [
+            { id: 'recipes', label: '1. Recipes' },
+            { id: 'images', label: '2. Slots' },
+            { id: 'matrix', label: '3. Matrix' },
+            { id: 'output', label: '4. Prompt' },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setMobileSection(tab.id)}
+            className={`min-h-[40px] px-2 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
+              mobileSection === tab.id
+                ? 'bg-[#f5c518] text-black font-bold'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
       {/* Hidden File Inputs for the 4 Slots */}
       <input
         ref={templateInputRef}
@@ -801,16 +826,19 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
       />
 
       {/* SECTION 1: SAVED RECIPES & LOCKED PRESETS BAR */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
+      <div
+        className={`studio-panel rounded-2xl p-4 sm:p-5 space-y-4 ${
+          mobileSection === 'recipes' ? 'block' : 'hidden lg:block'
+        }`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-display text-base sm:text-lg font-bold text-white">
-                Swap Studio · Recipe & Source Matrix
+                Swap Studio · Recipe &amp; Source Matrix
               </h2>
-              <span className="px-2 py-0.5 rounded-md bg-[#f5c518]/15 border border-[#f5c518]/30 text-[11px] font-mono font-bold text-[#f5c518]">
-                DETERMINISTIC
-              </span>
+              <span className="text-zinc-600" aria-hidden="true">·</span>
+              <span className="text-xs font-mono text-[#f5c518]">Deterministic Builder</span>
             </div>
             <p className="text-xs text-zinc-400 mt-0.5">
               Choose one of the 4 locked presets (verbatim prompt output) or duplicate a recipe to customize the Source Matrix switches.
@@ -821,7 +849,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
             <button
               type="button"
               onClick={() => handleDuplicateAndEdit()}
-              className="px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
             >
               <CopyPlus className="w-3.5 h-3.5" />
               <span>Duplicate and edit</span>
@@ -829,7 +857,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
           </div>
         </div>
 
-        {/* Recipe Pills */}
+        {/* Recipe Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           {recipes.map((recipe) => {
             const isSelected = recipe.id === activeRecipe.id;
@@ -842,8 +870,8 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 onClick={() => handleSelectRecipe(recipe)}
                 className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-2 ${
                   isSelected
-                    ? 'bg-[#f5c518]/12 border-[#f5c518] shadow-md'
-                    : 'bg-white/[0.03] border-white/10 hover:border-white/25 hover:bg-white/[0.05]'
+                    ? 'bg-[#f5c518]/12 border-[#f5c518]'
+                    : 'bg-white/[0.025] border-white/10 hover:border-white/25 hover:bg-white/[0.04]'
                 }`}
               >
                 <div className="space-y-1">
@@ -857,13 +885,11 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                       <span className="truncate">{recipe.name}</span>
                     </span>
                     <span
-                      className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                        recipe.isLockedPreset
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      className={`text-[11px] font-mono font-medium shrink-0 ${
+                        recipe.isLockedPreset ? 'text-amber-300' : 'text-emerald-300'
                       }`}
                     >
-                      {recipe.isLockedPreset ? 'LOCKED' : 'USER'}
+                      {recipe.isLockedPreset ? 'Locked' : 'Custom'}
                     </span>
                   </div>
                   <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
@@ -967,7 +993,11 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
       </div>
 
       {/* SECTION 2: UP TO 4 IMAGE SLOTS (RESIZED TO 1024PX, NO AUTO-SCAN) */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
+      <div
+        className={`studio-panel rounded-2xl p-4 sm:p-5 space-y-4 ${
+          mobileSection === 'images' ? 'block' : 'hidden lg:block'
+        }`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
           <div>
             <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
@@ -987,7 +1017,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 key={cnt}
                 type="button"
                 onClick={() => setPeopleCount(cnt)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
+                className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
                   peopleCount === cnt
                     ? 'bg-[#f5c518] text-black'
                     : 'bg-white/[0.06] text-zinc-400 hover:text-white'
@@ -1002,15 +1032,12 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
         {/* 4 Image Slot Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* SLOT 1: TEMPLATE (REQUIRED) */}
-          <div className="p-3.5 rounded-xl glass-card border border-white/15 flex flex-col justify-between gap-3">
+          <div className="p-3.5 rounded-xl studio-card flex flex-col justify-between gap-3">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-xs font-bold text-white flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#f5c518]" />
-                  <span>1. TEMPLATE</span>
-                </span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
-                  REQUIRED
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-display text-xs font-bold text-white">1. Template</span>
+                <span className="text-[11px] font-mono font-medium text-amber-300">
+                  Required
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400">
@@ -1073,15 +1100,12 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
           </div>
 
           {/* SLOT 2: FACE (REQUIRED) */}
-          <div className="p-3.5 rounded-xl glass-card border border-white/15 flex flex-col justify-between gap-3">
+          <div className="p-3.5 rounded-xl studio-card flex flex-col justify-between gap-3">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-xs font-bold text-white flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#f5c518]" />
-                  <span>2. FACE</span>
-                </span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
-                  REQUIRED
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-display text-xs font-bold text-white">2. Face</span>
+                <span className="text-[11px] font-mono font-medium text-amber-300">
+                  Required
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400">
@@ -1153,24 +1177,19 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
 
           {/* SLOT 3: MANNEQUIN (OPTIONAL) */}
           <div
-            className={`p-3.5 rounded-xl glass-card border flex flex-col justify-between gap-3 ${
-              switches.body === 'mannequin'
-                ? 'border-[#f5c518]/50 bg-[#f5c518]/[0.03]'
-                : 'border-white/10 opacity-85'
+            className={`p-3.5 rounded-xl studio-card flex flex-col justify-between gap-3 ${
+              switches.body === 'mannequin' ? 'border-[#f5c518]/50' : ''
             }`}
           >
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-xs font-bold text-white flex items-center gap-1.5">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      switches.body === 'mannequin' ? 'bg-[#f5c518]' : 'bg-zinc-600'
-                    }`}
-                  />
-                  <span>3. MANNEQUIN</span>
-                </span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">
-                  {switches.body === 'mannequin' ? 'NEEDED BY MATRIX' : 'OPTIONAL'}
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-display text-xs font-bold text-white">3. Mannequin</span>
+                <span
+                  className={`text-[11px] font-mono ${
+                    switches.body === 'mannequin' ? 'text-[#f5c518] font-medium' : 'text-zinc-400'
+                  }`}
+                >
+                  {switches.body === 'mannequin' ? 'Active in Matrix' : 'Optional'}
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400">
@@ -1231,24 +1250,21 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
 
           {/* SLOT 4: MAN (OPTIONAL) */}
           <div
-            className={`p-3.5 rounded-xl glass-card border flex flex-col justify-between gap-3 ${
-              peopleCount === 2 && secondPersonSwapped
-                ? 'border-[#f5c518]/50 bg-[#f5c518]/[0.03]'
-                : 'border-white/10 opacity-85'
+            className={`p-3.5 rounded-xl studio-card flex flex-col justify-between gap-3 ${
+              peopleCount === 2 && secondPersonSwapped ? 'border-[#f5c518]/50' : ''
             }`}
           >
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-xs font-bold text-white flex items-center gap-1.5">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      peopleCount === 2 && secondPersonSwapped ? 'bg-[#f5c518]' : 'bg-zinc-600'
-                    }`}
-                  />
-                  <span>4. MAN</span>
-                </span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/10 text-zinc-300">
-                  {peopleCount === 2 && secondPersonSwapped ? '2-PERSON ACTIVE' : 'OPTIONAL'}
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-display text-xs font-bold text-white">4. Man</span>
+                <span
+                  className={`text-[11px] font-mono ${
+                    peopleCount === 2 && secondPersonSwapped
+                      ? 'text-[#f5c518] font-medium'
+                      : 'text-zinc-400'
+                  }`}
+                >
+                  {peopleCount === 2 && secondPersonSwapped ? '2-Person Active' : 'Optional'}
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400">
@@ -1371,7 +1387,10 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
       </div>
 
       {/* SECTION 3: SOURCE MATRIX SCREEN & LOCKED RULES */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
+      <div
+        className={`space-y-5 ${mobileSection === 'matrix' ? 'block' : 'hidden lg:block'}`}
+      >
+      <div className="studio-panel rounded-2xl p-4 sm:p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
           <div>
             <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
@@ -1385,8 +1404,8 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
             </p>
           </div>
           {matchedPresetId && (
-            <span className="text-[11px] font-mono text-emerald-300 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
-              Matches verbatim preset: {matchedPresetId.toUpperCase()}
+            <span className="text-xs font-mono text-emerald-300 shrink-0">
+              Matches preset: {matchedPresetId.toUpperCase()}
             </span>
           )}
         </div>
@@ -1787,7 +1806,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
 
       {/* SECTION 4: INSTANT CONFLICT CHECKER */}
       {conflicts.length > 0 && (
-        <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-3 border border-amber-500/40">
+        <div className="studio-panel rounded-2xl p-4 sm:p-5 space-y-3 border border-amber-500/40">
           <div className="flex items-center justify-between">
             <h3 className="font-display text-xs sm:text-sm font-bold text-white flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-amber-400" />
@@ -1813,13 +1832,11 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
               >
                 <div className="flex items-start gap-2">
                   <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0 mt-0.5 ${
-                      item.blocking
-                        ? 'bg-red-500/30 text-red-200'
-                        : 'bg-amber-500/30 text-amber-200'
+                    className={`text-[11px] font-mono font-bold shrink-0 mt-0.5 ${
+                      item.blocking ? 'text-red-300' : 'text-amber-300'
                     }`}
                   >
-                    {item.blocking ? 'Blocking' : 'Warning'}
+                    {item.blocking ? 'Blocking:' : 'Warning:'}
                   </span>
                   <span>{item.message}</span>
                 </div>
@@ -1827,7 +1844,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => handleApplyConflictFix(item)}
-                  className="px-3 py-1.5 rounded-lg bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs shrink-0 flex items-center gap-1.5 transition cursor-pointer"
+                  className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs shrink-0 flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Wrench className="w-3.5 h-3.5" />
                   <span>{item.fixLabel}</span>
@@ -1837,9 +1854,14 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
           </div>
         </div>
       )}
+      </div>
 
       {/* SECTION 5: OUTPUT SCREEN & CHEAT SHEET */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
+      <div
+        className={`studio-panel rounded-2xl p-4 sm:p-5 space-y-4 ${
+          mobileSection === 'output' ? 'block' : 'hidden lg:block'
+        }`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
           <div>
             <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">

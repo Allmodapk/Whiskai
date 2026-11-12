@@ -37,56 +37,38 @@ import {
   ScanDebugReportData,
 } from './services/scanNormalizer';
 import { SubjectData, ContradictionIssue } from './types';
-import { ComponentCard } from './components/ComponentCard';
-import { ScanProgressPanel } from './components/ScanProgressPanel';
 import { ProfileManager } from './components/ProfileManager';
 import { BlueprintProjects } from './components/BlueprintProjects';
-import { PromptCheckBanner } from './components/PromptCheckBanner';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { CameraAngleController } from './components/CameraAngleController';
 import { CameraPlayboardStudio } from './components/CameraPlayboardStudio';
-import { ReferenceViewfinder } from './components/ReferenceViewfinder';
-import { FloatingPromptDock } from './components/FloatingPromptDock';
 import { SwapStudio } from './components/SwapStudio';
 import { CameraAI } from './components/CameraAI';
 import { PerspectivePlayboard } from './components/perspectivePlayboard/PerspectivePlayboard';
-import { motion, AnimatePresence } from 'motion/react';
+import {
+  GeneralExtractorWorkspace,
+  type SceneAccordionGroup,
+} from './components/GeneralExtractorWorkspace';
+import { BottomSheet } from './components/ui/StudioPrimitives';
 import {
   Wrench,
   Users,
   FolderKanban,
-  Upload,
-  Lock,
   Sparkles,
-  Copy,
-  Download,
-  Check,
-  RotateCcw,
-  ShieldCheck,
-  Plus,
-  BookmarkPlus,
-  Shirt,
   UserCheck,
   Camera,
   FileSearch,
-  Image as ImageIcon,
-  EyeOff,
   Loader2,
   Sliders,
-  ChevronDown,
-  ChevronUp,
   ExternalLink,
   ArrowLeft,
   AlertTriangle,
-  Info,
   X,
-  CheckSquare,
-  Square,
-  User,
   ListChecks,
-  Bug,
   Compass,
+  ArrowRight,
+  Layers,
 } from 'lucide-react';
 
 function checkIsCameraRoute(): { isCameraRoute: boolean; mode: 'playboard' | 'extractor' } {
@@ -176,12 +158,11 @@ export default function App() {
   );
   const [popupFallbackBanner, setPopupFallbackBanner] = useState<boolean>(false);
 
-  // Main Navigation: Tools | Profiles | Projects
+  // Main Navigation: Tools | Profiles | Projects & Hub vs Workspace state
   const [activeNav, setActiveNav] = useState<'tools' | 'profiles' | 'projects'>('tools');
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState<boolean>(false);
 
   // Active Tool inside Main Tools page:
-  // 1. General Prompt Extractor ('general_extractor')
-  // 2. Subject Swapping ('subject_swapping')
   const [activeTool, setActiveTool] = useState<ToolType>(() => {
     const saved = StorageService.getActiveTool();
     return saved === 'camera_controller' ? 'general_extractor' : saved;
@@ -329,13 +310,7 @@ export default function App() {
     expression_gestures: true,
   });
 
-  const SCENE_ACCORDION_GROUPS: Array<{
-    id: string;
-    title: string;
-    subtitle: string;
-    codes: string;
-    keys: ComponentKey[];
-  }> = [
+  const SCENE_ACCORDION_GROUPS: SceneAccordionGroup[] = [
     {
       id: 'identity_pose',
       title: 'Identity, Body & Pose Geometry',
@@ -408,6 +383,8 @@ export default function App() {
     const prevTool = activeTool;
     setActiveTool(tool);
     StorageService.setActiveTool(tool);
+    setActiveNav('tools');
+    setIsWorkspaceOpen(true);
 
     if (components) {
       if (tool === 'subject_swapping') {
@@ -1649,6 +1626,7 @@ export default function App() {
       setProjectTitleInput(blueprint.title || '');
       setTargetModel(blueprint.targetModel || 'universal');
       setActiveNav('tools');
+      setIsWorkspaceOpen(true);
       return;
     }
     if (blueprint.components && Object.keys(blueprint.components).length > 0) {
@@ -1700,6 +1678,7 @@ export default function App() {
     }
 
     setActiveNav('tools');
+    setIsWorkspaceOpen(true);
   };
 
   // Copy prompt
@@ -1851,54 +1830,579 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* Glassmorphic Spatial Pro Studio Top Header Bar */}
-          <header className="sticky top-0 z-40 bg-[#06070b]/80 backdrop-blur-2xl border-b border-white/[0.08] px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#FFE169] via-[#F5C518] to-[#D49A00] flex items-center justify-center font-black text-black shadow-lg shadow-amber-500/20">
-              <Sparkles className="w-4 h-4 text-black stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-display font-extrabold text-sm sm:text-base tracking-tight text-white">
+          {/* Compact 3-Zone Studio Top Bar */}
+          <header className="sticky top-0 z-40 h-14 bg-[#07090e]/95 border-b border-white/[0.08] px-4">
+            <div className="max-w-6xl mx-auto h-full flex items-center justify-between gap-6">
+              {/* Zone 1: Brand Wordmark */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic();
+                  setActiveNav('tools');
+                  setIsWorkspaceOpen(false);
+                }}
+                className="flex items-center gap-2.5 text-left cursor-pointer shrink-0 group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#f5c518] flex items-center justify-center text-black shrink-0">
+                  <Sparkles className="w-4 h-4 stroke-[2.4]" />
+                </div>
+                <span className="font-display font-bold text-sm sm:text-base tracking-tight text-white whitespace-nowrap group-hover:text-[#f5c518] transition-colors">
                   My Whisk <span className="text-[#f5c518]">AI</span>
                 </span>
-                <span className="text-zinc-600 hidden sm:inline" aria-hidden="true">
-                  ·
-                </span>
-                <span className="text-xs font-mono text-zinc-400 hidden sm:inline">
-                  Spatial Optical Prompt Studio
-                </span>
+              </button>
+
+              {/* Zone 2: Concise Primary Navigation (Desktop) */}
+              <nav
+                aria-label="Primary studio sections"
+                className="hidden md:flex items-center gap-6"
+              >
+                {(
+                  [
+                    { id: 'tools', label: 'Studio Hub' },
+                    { id: 'profiles', label: 'Profiles' },
+                    { id: 'projects', label: 'Projects' },
+                  ] as const
+                ).map((item) => {
+                  const isActive = activeNav === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic();
+                        setActiveNav(item.id);
+                        if (item.id === 'tools') setIsWorkspaceOpen(false);
+                      }}
+                      className={`relative py-1.5 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                        isActive ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      {isActive && (
+                        <span className="absolute left-0 right-0 -bottom-[15px] h-0.5 bg-[#f5c518] rounded-full" />
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Zone 3: Single Primary Action */}
+              <div className="flex items-center shrink-0">
+                {activeNav === 'tools' && isWorkspaceOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic();
+                      setIsWorkspaceOpen(false);
+                    }}
+                    className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-zinc-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5 text-[#f5c518]" />
+                    <span>Studio Hub</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTool('perspective_playboard')}
+                    className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                  >
+                    <Compass className="w-3.5 h-3.5" />
+                    <span>3D Playboard</span>
+                  </button>
+                )}
               </div>
             </div>
-          </div>
+          </header>
 
-          {/* Primary Top-Level Navigation: Tools | Profiles | Projects with Spring Pill + PWA Install + Debug Toggle */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleToggleDebug}
-              title="Toggle On-Screen Scan Debug Panel"
-              className={`min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold flex items-center gap-1.5 border transition cursor-pointer ${
-                isDebugEnabled
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  : 'bg-white/[0.04] text-zinc-400 hover:text-white border-white/10'
-              }`}
+          {/* Main Container */}
+          <main
+            className={`flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-6 ${
+              !isWorkspaceOpen || activeNav !== 'tools' ? 'pb-24 md:pb-12' : 'pb-10'
+            }`}
+          >
+            {/* TAB 1: STUDIO HUB & DEDICATED WORKSPACES */}
+            {activeNav === 'tools' && !isWorkspaceOpen && (
+              <div className="space-y-6">
+                {/* Concise Studio Hub Hero */}
+                <section className="studio-panel rounded-2xl p-5 sm:p-7 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                  <div className="space-y-2 max-w-2xl">
+                    <div className="text-xs font-mono text-[#f5c518] tracking-wide">
+                      My Whisk AI · Prompt Engineering &amp; Camera Control Studio
+                    </div>
+                    <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+                      Structured Prompt &amp; Perspective Control
+                    </h1>
+                    <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                      Deconstruct reference photography into editable visual blueprints, swap subject identities, extract lens perspective, or frame virtual camera angles in 3D.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-2.5 shrink-0">
+                    <PWAInstallButton variant="banner" />
+                    <div className="flex items-center gap-3 text-xs font-mono text-zinc-400">
+                      <span>{StorageService.getProfiles().length} Profiles</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{StorageService.getBlueprints().length} Saved Projects</span>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 5 Specialized Tool Launch Cards */}
+                <section aria-label="Creative studio tools" className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-display text-sm font-bold text-white tracking-tight">
+                      Select a Workspace
+                    </h2>
+                    <span className="text-xs text-zinc-500">Tap any tool to open its workspace</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {(
+                      [
+                        {
+                          id: 'general_extractor',
+                          index: '01',
+                          tag: '13-Component Extraction',
+                          title: 'General Prompt Extractor',
+                          desc: 'Analyze any image into 13 grounded visual fields, filter or edit details, merge saved profiles, and compile clean prompts.',
+                          icon: FileSearch,
+                        },
+                        {
+                          id: 'subject_swapping',
+                          index: '02',
+                          tag: 'Identity Transfer',
+                          title: 'Swap Studio',
+                          desc: 'Deterministic multi-image subject replacement using locked recipes, 4 slot controls, and Source Matrix switches.',
+                          icon: UserCheck,
+                        },
+                        {
+                          id: 'perspective_playboard',
+                          index: '03',
+                          tag: 'Interactive 3D Camera',
+                          title: '3D Perspective Playboard',
+                          desc: 'Orbit a virtual camera around a fixed 3D subject, lock framing and focal length, and compile a 9-section camera prompt.',
+                          icon: Compass,
+                        },
+                        {
+                          id: 'camera_ai',
+                          index: '04',
+                          tag: 'Optical Re-Shoot',
+                          title: 'Camera AI',
+                          desc: "Extract a template photo's elevation, azimuth, distance, and optics to re-shoot your own image from that camera angle.",
+                          icon: Sliders,
+                        },
+                        {
+                          id: 'camera_controller',
+                          index: '05',
+                          tag: 'Full-Screen Studio',
+                          title: 'Camera Angle Controller',
+                          desc: 'Dedicated full-screen 3D pose & camera rig workspace for multi-angle staging and reference camera breakdown.',
+                          icon: Camera,
+                        },
+                      ] as const
+                    ).map((tool) => {
+                      const Icon = tool.icon;
+                      if (tool.id === 'camera_controller') {
+                        return (
+                          <div
+                            key={tool.id}
+                            className="studio-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 hover:border-[#f5c518]/45 transition-colors"
+                          >
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-9 h-9 rounded-xl bg-[#f5c518]/12 border border-[#f5c518]/30 flex items-center justify-center text-[#f5c518] shrink-0">
+                                    <Icon className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <div className="text-[11px] font-mono text-zinc-400">
+                                      {tool.index} · {tool.tag}
+                                    </div>
+                                    <h3 className="font-display text-sm sm:text-base font-bold text-white">
+                                      {tool.title}
+                                    </h3>
+                                  </div>
+                                </div>
+                              </div>
+                              <p className="text-xs text-zinc-400 leading-relaxed">{tool.desc}</p>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-3 border-t border-white/[0.07]">
+                              <a
+                                href="/camera-controller"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => handleCameraNewTabLaunch('playboard')}
+                                className="flex-1 min-h-[42px] px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                              >
+                                <span>Launch New Tab</span>
+                                <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => openCameraInCurrentTab('playboard')}
+                                className="min-h-[42px] px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 border border-white/10 text-xs font-semibold transition cursor-pointer whitespace-nowrap"
+                              >
+                                Open Here
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={tool.id}
+                          type="button"
+                          onClick={() => handleSelectTool(tool.id)}
+                          className="studio-card hover:border-[#f5c518]/50 hover:bg-[#151a26] rounded-2xl p-4 sm:p-5 text-left flex flex-col justify-between gap-4 transition-all cursor-pointer group"
+                        >
+                          <div className="space-y-2.5 w-full">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-9 h-9 rounded-xl bg-[#f5c518]/12 border border-[#f5c518]/30 flex items-center justify-center text-[#f5c518] shrink-0 group-hover:bg-[#f5c518] group-hover:text-black transition-colors">
+                                  <Icon className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[11px] font-mono text-zinc-400 truncate">
+                                    {tool.index} · {tool.tag}
+                                  </div>
+                                  <h3 className="font-display text-sm sm:text-base font-bold text-white group-hover:text-[#f5c518] transition-colors truncate">
+                                    {tool.title}
+                                  </h3>
+                                </div>
+                              </div>
+                            </div>
+                            <p className="text-xs text-zinc-400 leading-relaxed">{tool.desc}</p>
+                          </div>
+
+                          <div className="w-full pt-3 border-t border-white/[0.07] flex items-center justify-between text-xs font-semibold text-zinc-300 group-hover:text-[#f5c518] transition-colors">
+                            <span>Open Workspace</span>
+                            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Graceful Popup Restriction Fallback Banner */}
+                  {popupFallbackBanner && (
+                    <div className="p-3.5 rounded-xl bg-[#111726] border border-[#f5c518]/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="text-xs text-zinc-200">
+                        <span className="font-bold text-white">
+                          Camera Angle Controller launched in a new tab.
+                        </span>{' '}
+                        If popups are blocked on mobile, open it directly in this tab:
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => openCameraInCurrentTab('playboard')}
+                          className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold transition cursor-pointer"
+                        >
+                          Open in Current Tab
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPopupFallbackBanner(false)}
+                          className="min-h-[38px] px-2.5 py-1.5 rounded-xl text-xs text-zinc-400 hover:text-white cursor-pointer"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                {/* Recent Saved Projects Quick Resume */}
+                {(() => {
+                  const recentBlueprints = StorageService.getBlueprints().slice(0, 3);
+                  if (recentBlueprints.length === 0) return null;
+                  return (
+                    <section aria-label="Recent saved projects" className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h2 className="font-display text-sm font-bold text-white tracking-tight">
+                          Recent Projects
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => setActiveNav('projects')}
+                          className="text-xs font-semibold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>View All</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {recentBlueprints.map((bp) => (
+                          <button
+                            key={bp.id}
+                            type="button"
+                            onClick={() => handleLoadBlueprint(bp)}
+                            className="studio-card hover:border-[#f5c518]/45 rounded-2xl p-3.5 text-left flex items-center gap-3 transition-colors cursor-pointer"
+                          >
+                            {bp.referenceThumbnails?.[0] ? (
+                              <img
+                                src={bp.referenceThumbnails[0]}
+                                alt={bp.title}
+                                className="w-12 h-12 rounded-xl object-cover border border-white/10 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400 shrink-0">
+                                <Layers className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-display text-xs font-bold text-white truncate">
+                                {bp.title}
+                              </div>
+                              <div className="text-[11px] font-mono text-zinc-400 mt-0.5 truncate tabular-nums">
+                                {bp.outputRatio} · {new Date(bp.updatedAt || bp.createdAt).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* DEDICATED WORKSPACE VIEW */}
+            {activeNav === 'tools' && isWorkspaceOpen && (
+              <div className="space-y-5">
+                {/* Workspace Switcher Bar */}
+                <div className="studio-panel rounded-2xl p-2.5 sm:px-3.5 flex flex-wrap items-center justify-between gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic();
+                      setIsWorkspaceOpen(false);
+                    }}
+                    className="min-h-[40px] px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-zinc-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5 text-[#f5c518]" />
+                    <span>Studio Hub</span>
+                  </button>
+
+                  {/* Quick Switcher between the 4 Workspace Tools */}
+                  <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
+                    {(
+                      [
+                        { id: 'general_extractor', label: 'Extractor' },
+                        { id: 'subject_swapping', label: 'Swap Studio' },
+                        { id: 'perspective_playboard', label: '3D Playboard' },
+                        { id: 'camera_ai', label: 'Camera AI' },
+                      ] as const
+                    ).map((t) => {
+                      const active = activeTool === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => handleSelectTool(t.id)}
+                          className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
+                            active
+                              ? 'bg-[#f5c518] text-black font-bold'
+                              : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Render Dedicated Workspace for Active Tool */}
+                {(activeTool as string) === 'subject_swapping' ? (
+                  <SwapStudio
+                    optimizeImageFile={optimizeImageFile}
+                    onOpenProjects={() => setActiveNav('projects')}
+                  />
+                ) : (activeTool as string) === 'camera_ai' ? (
+                  <CameraAI
+                    optimizeImageFile={optimizeImageFile}
+                    onOpenProjects={() => setActiveNav('projects')}
+                  />
+                ) : (activeTool as string) === 'perspective_playboard' ? (
+                  <PerspectivePlayboard
+                    optimizeImageFile={optimizeImageFile}
+                    onOpenProjects={() => setActiveNav('projects')}
+                  />
+                ) : (
+                  <GeneralExtractorWorkspace
+                    activeTool={activeTool}
+                    referenceImage={referenceImage}
+                    isDragging={isDragging}
+                    setIsDragging={setIsDragging}
+                    onFileDrop={handleFileDrop}
+                    onOpenFilePicker={() => fileInputRef.current?.click()}
+                    onClearReference={() => {
+                      setReferenceImage(null);
+                      setComponents(null);
+                      setOriginalComponents(null);
+                      setGeneratedMasterPrompt(null);
+                    }}
+                    isScanning={isScanning}
+                    scanStageIndex={scanStageIndex}
+                    scanError={scanError}
+                    fallbackNotice={fallbackNotice}
+                    onScanReference={handleScanReference}
+                    isQuotaFallback={isQuotaFallback}
+                    quotaFallbackAcknowledged={quotaFallbackAcknowledged}
+                    onAcknowledgeQuotaFallback={() => setQuotaFallbackAcknowledged(true)}
+                    lowVisibilityError={lowVisibilityError}
+                    hasMultiSnapshotReady={Boolean(
+                      multiCanonicalSnapshot && multiCanonicalSnapshot.visibleCount >= 3
+                    )}
+                    onConsiderAllSubjects={handleConsiderAllSubjects}
+                    onContinueManuallyAfterLowVis={() => {
+                      setLowVisibilityError(null);
+                      if (components) {
+                        const manualComps = { ...components };
+                        for (const k of ALL_COMPONENT_KEYS) {
+                          if (manualComps[k]?.state === 'unavailable') {
+                            manualComps[k] = {
+                              ...manualComps[k],
+                              state: 'edited',
+                              visibility: 'visible',
+                            };
+                          }
+                        }
+                        setComponents(manualComps);
+                      }
+                    }}
+                    isDebugEnabled={isDebugEnabled}
+                    onToggleDebug={handleToggleDebug}
+                    scanDebugReport={scanDebugReport}
+                    isDebugPanelOpen={isDebugPanelOpen}
+                    onToggleDebugPanelOpen={() => setIsDebugPanelOpen((prev) => !prev)}
+                    debugCopyFeedback={debugCopyFeedback}
+                    onCopyDebugReport={handleCopyDebugReport}
+                    soloRewriteWarning={soloRewriteWarning}
+                    isRewritingFields={isRewritingFields}
+                    onRewriteFieldsSolo={handleRewriteFieldsSolo}
+                    components={components}
+                    componentCounts={componentCounts}
+                    scanSummary={scanSummary}
+                    detectedSubjects={detectedSubjects}
+                    activeSubjectDecision={activeSubjectDecision}
+                    onOpenMultiSubjectModal={() => setIsMultiSubjectModalOpen(true)}
+                    tickedComponentKeys={tickedComponentKeys}
+                    onOpenChecklistModal={() => setIsChecklistStepOpen(true)}
+                    onRestoreAllOriginal={handleRestoreAllOriginal}
+                    projectTitleInput={projectTitleInput}
+                    onChangeProjectTitleInput={setProjectTitleInput}
+                    onSaveBlueprint={handleSaveBlueprint}
+                    savedBlueprintNotice={savedBlueprintNotice}
+                    outputRatio={outputRatio}
+                    ratioExplanation={ratioExplanation}
+                    onChangeOutputRatio={(ratio) => {
+                      triggerHaptic();
+                      setOutputRatio(ratio);
+                      if (generatedMasterPrompt) setHasUnbuiltChanges(true);
+                    }}
+                    sceneFilter={sceneFilter}
+                    onChangeSceneFilter={(filter) => {
+                      triggerHaptic();
+                      setSceneFilter(filter);
+                    }}
+                    sceneAccordionGroups={SCENE_ACCORDION_GROUPS}
+                    openSceneGroups={openSceneGroups}
+                    onToggleSceneGroup={(groupId) => {
+                      triggerHaptic();
+                      setOpenSceneGroups((prev) => ({
+                        ...prev,
+                        [groupId]: !(prev[groupId] !== false),
+                      }));
+                    }}
+                    onExpandAllGroups={() =>
+                      setOpenSceneGroups({
+                        identity_pose: true,
+                        camera_framing: true,
+                        wardrobe_scene: true,
+                        expression_gestures: true,
+                      })
+                    }
+                    onCollapseAllGroups={() =>
+                      setOpenSceneGroups({
+                        identity_pose: false,
+                        camera_framing: false,
+                        wardrobe_scene: false,
+                        expression_gestures: false,
+                      })
+                    }
+                    onUpdateComponentState={handleUpdateComponentState}
+                    onUpdateComponentText={handleUpdateComponentText}
+                    onApplyBackgroundBundle={handleApplyBackgroundBundle}
+                    generatedMasterPrompt={generatedMasterPrompt}
+                    exportedPrompt={exportedPrompt}
+                    hasUnbuiltChanges={hasUnbuiltChanges}
+                    onGenerateFinalPrompt={handleGenerateFinalPrompt}
+                    targetModel={targetModel}
+                    onSetTargetModel={setTargetModel}
+                    showNegativePrompt={showNegativePrompt}
+                    onSetShowNegativePrompt={setShowNegativePrompt}
+                    generatedNegativePrompt={generatedNegativePrompt}
+                    onSetGeneratedNegativePrompt={setGeneratedNegativePrompt}
+                    promptCheck={promptCheck}
+                    onApplySafetyFix={handleApplySafetyFix}
+                    onCopyPrompt={handleCopyPrompt}
+                    onDownloadPrompt={handleDownloadPrompt}
+                    copyFeedback={copyFeedback}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: PROFILES */}
+            {activeNav === 'profiles' && (
+              <ProfileManager
+                activeProfileId={activeProfile.id}
+                onSelectProfile={handleSelectProfile}
+                activeOutfitId={activeOutfit.id}
+                onSelectOutfit={handleSelectOutfit}
+              />
+            )}
+
+            {/* TAB 3: PROJECTS */}
+            {activeNav === 'projects' && (
+              <BlueprintProjects onLoadBlueprint={handleLoadBlueprint} />
+            )}
+          </main>
+
+          {/* Clean Footer (Hidden in dedicated tool workspaces on mobile to prioritize content) */}
+          <footer className="hidden md:block border-t border-white/[0.07] bg-[#07090e] py-5 px-4 text-xs text-zinc-500">
+            <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="font-display font-bold text-zinc-300">My Whisk AI</span>
+                <span aria-hidden="true">·</span>
+                <span>Visual Prompt &amp; Camera Reference Studio</span>
+              </div>
+              <div className="text-[11px] font-mono text-zinc-500">
+                Local-first profiles &amp; projects storage
+              </div>
+            </div>
+          </footer>
+
+          {/* Thumb-Friendly Mobile Bottom Navigation (Hidden inside open tool workspaces to avoid stacking) */}
+          {(!isWorkspaceOpen || activeNav !== 'tools') && (
+            <nav
+              aria-label="Mobile navigation"
+              className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 pb-safe-nav bg-[#0a0d14]/95 border-t border-white/[0.09] px-2 flex items-center justify-around"
             >
-              <Bug className="w-3.5 h-3.5" />
-              <span>Debug {isDebugEnabled ? 'ON' : 'OFF'}</span>
-            </button>
-            <PWAInstallButton />
-            <nav className="flex items-center gap-1 p-1 bg-black/50 backdrop-blur-xl border border-white/[0.09] rounded-xl">
               {(
                 [
-                  { id: 'tools', label: 'Tools', icon: Wrench },
+                  { id: 'tools', label: 'Studio Hub', icon: Wrench },
                   { id: 'profiles', label: 'Profiles', icon: Users },
                   { id: 'projects', label: 'Projects', icon: FolderKanban },
                 ] as const
               ).map((item) => {
                 const Icon = item.icon;
-                const isActive = activeNav === item.id;
+                const active = activeNav === item.id;
                 return (
                   <button
                     key={item.id}
@@ -1906,1569 +2410,118 @@ export default function App() {
                     onClick={() => {
                       triggerHaptic();
                       setActiveNav(item.id);
+                      if (item.id === 'tools') setIsWorkspaceOpen(false);
                     }}
-                    className={`relative min-h-[36px] px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
-                      isActive ? 'text-black' : 'text-zinc-400 hover:text-white'
+                    className={`min-h-[44px] flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition cursor-pointer ${
+                      active ? 'text-[#f5c518]' : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
-                    {isActive && (
-                      <motion.div
-                        layoutId="primaryNavPill"
-                        transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                        className="absolute inset-0 rounded-lg bg-[#f5c518] shadow-sm shadow-amber-500/30"
-                      />
-                    )}
-                    <Icon className="relative z-10 w-3.5 h-3.5" />
-                    <span className="relative z-10">{item.label}</span>
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={() => handleSelectTool('perspective_playboard')}
+                className="min-h-[44px] flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold text-zinc-300 hover:text-[#f5c518] transition cursor-pointer"
+              >
+                <Compass className="w-4 h-4 text-[#f5c518]" />
+                <span>3D Rig</span>
+              </button>
             </nav>
-          </div>
-        </div>
-      </header>
+          )}
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 pb-28 space-y-6">
-        {/* TAB 1: TOOLS */}
-        {activeNav === 'tools' && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="space-y-6"
+          {/* Multi-Subject Decision Bottom Sheet / Modal */}
+          <BottomSheet
+            isOpen={isMultiSubjectModalOpen}
+            onClose={() => setIsMultiSubjectModalOpen(false)}
+            title={`Multiple Subjects Detected (${detectedSubjects.length})`}
+            subtitle="Choose how to structure the extracted prompt blueprint"
+            icon={<Users className="w-4 h-4" />}
           >
-            {/* Three Tools Selector Bar inside Tools */}
-            <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h1 className="font-display text-base sm:text-lg font-bold text-white tracking-tight">
-                    Visual Analysis & Prompt Engineering Tools
-                  </h1>
-                  <p className="text-xs text-zinc-400">
-                    Select a specialized optical tool below. Upload one reference image to extract grounded visual or camera parameters.
-                  </p>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleConsiderAllSubjects}
+                className="w-full min-h-[56px] p-4 rounded-xl bg-[#f5c518]/12 hover:bg-[#f5c518]/18 border border-[#f5c518]/45 text-left transition space-y-1 cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-2 font-bold text-sm text-[#f5c518]">
+                  <span>Consider all subjects in scene</span>
+                  <span className="text-xs font-mono">Multi-Subject</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-300 bg-white/[0.04] border border-white/10 px-3 py-1.5 rounded-xl shrink-0">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Grounded Multimodal Vision</span>
-                </div>
+                <p className="text-xs text-zinc-300">
+                  Keeps spatial relationships, interaction, and descriptions for all detected people.
+                </p>
+              </button>
+
+              <div className="text-xs font-semibold text-zinc-400 pt-1">
+                Or isolate one subject (Solo Mode):
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                {(
-                  [
-                    {
-                      id: 'general_extractor',
-                      num: '01',
-                      title: '1. General Prompt Extractor',
-                      desc: 'Analyze one image into 13 detailed, editable visual components and combine with saved profiles.',
-                      icon: FileSearch,
-                    },
-                    {
-                      id: 'subject_swapping',
-                      num: '02',
-                      title: '2. Swap Studio',
-                      desc: 'Modular multi-image subject swapping with 4 locked presets, Source Matrix switches, and deterministic prompt assembly.',
-                      icon: UserCheck,
-                    },
-                    {
-                      id: 'camera_controller',
-                      num: '03',
-                      title: '3. Camera Angle Controller',
-                      desc: 'Opens in a dedicated full-screen workspace: 3D playboard for camera & pose simulation (T2I / I2I) and reference extraction.',
-                      icon: Camera,
-                    },
-                    {
-                      id: 'camera_ai',
-                      num: '04',
-                      title: '4. Camera AI',
-                      desc: "Extract any image's camera position & lens framing. Re-shoot your own image from that exact position.",
-                      icon: Sliders,
-                    },
-                    {
-                      id: 'perspective_playboard',
-                      num: '05',
-                      title: '5. 3D Perspective Playboard',
-                      desc: 'Orbit a virtual camera around a fixed 3D subject, lock the frame, and compile a 9-section I2I camera prompt.',
-                      icon: Compass,
-                    },
-                  ] as const
-                ).map((tool) => {
-                  const Icon = tool.icon;
-                  const isCameraTool = tool.id === 'camera_controller';
-                  const isSelected = !isCameraTool && activeTool === tool.id;
-
-                  if (isCameraTool) {
-                    return (
-                      <div
-                        key={tool.id}
-                        className="relative text-left p-4 rounded-2xl transition-all flex flex-col justify-between gap-3 glass-card hover:border-[#f5c518]/40 hover:bg-white/[0.06] overflow-hidden"
-                      >
-                        <a
-                          href="/camera-controller"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => handleCameraNewTabLaunch('playboard')}
-                          className="flex flex-col gap-2 cursor-pointer group"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-display text-xs sm:text-sm font-bold text-white group-hover:text-[#f5c518] transition-colors flex items-center gap-2">
-                              <Icon className="w-4 h-4 text-[#f5c518] shrink-0" />
-                              <span>{tool.title}</span>
-                            </span>
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#f5c518]/15 text-[#f5c518] border border-[#f5c518]/30 flex items-center gap-1 shrink-0">
-                              <span>NEW TAB</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </span>
-                          </div>
-                          <p className="text-xs text-zinc-400 leading-relaxed">{tool.desc}</p>
-                        </a>
-
-                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/[0.08]">
-                          <a
-                            href="/camera-controller"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => handleCameraNewTabLaunch('playboard')}
-                            className="flex-1 py-1.5 px-3 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                          >
-                            <span>🎮 3D Playboard Studio</span>
-                            <ExternalLink className="w-3 h-3 shrink-0" />
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => openCameraInCurrentTab('playboard')}
-                            className="py-1.5 px-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/10 text-[11px] font-semibold transition cursor-pointer"
-                            title="Open full-screen in this tab"
-                          >
-                            Open Here
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <button
-                      key={tool.id}
-                      type="button"
-                      onClick={() => handleSelectTool(tool.id)}
-                      className={`relative text-left p-4 rounded-2xl transition-all flex flex-col justify-between gap-2.5 cursor-pointer overflow-hidden ${
-                        isSelected
-                          ? 'glass-card-active'
-                          : 'glass-card hover:border-white/20 hover:bg-white/[0.06]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-display text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                          <Icon className="w-4 h-4 text-[#f5c518] shrink-0" />
-                          <span>{tool.title}</span>
-                        </span>
-                        <span
-                          className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md tabular-nums ${
-                            isSelected
-                              ? 'bg-[#f5c518] text-black font-bold'
-                              : 'bg-white/[0.06] text-zinc-400'
-                          }`}
-                        >
-                          {isSelected ? 'ACTIVE' : tool.num}
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-400 leading-relaxed">{tool.desc}</p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Graceful Popup Restriction Fallback Banner */}
-              {popupFallbackBanner && (
-                <div className="p-3.5 rounded-xl bg-indigo-950/60 border border-indigo-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="text-xs text-indigo-200">
-                    <span className="font-bold text-white">Camera Angle Controller launched in a new tab.</span>{' '}
-                    If your browser blocked the new tab, you can open the full-screen controller directly in this tab:
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openCameraInCurrentTab('playboard')}
-                      className="px-3.5 py-1.5 rounded-lg bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold transition cursor-pointer"
-                    >
-                      Open in Current Tab →
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPopupFallbackBanner(false)}
-                      className="px-2 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white cursor-pointer"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {(activeTool as string) === 'subject_swapping' ? (
-              <SwapStudio
-                optimizeImageFile={optimizeImageFile}
-                onOpenProjects={() => setActiveNav('projects')}
-              />
-            ) : (activeTool as string) === 'camera_ai' ? (
-              <CameraAI
-                optimizeImageFile={optimizeImageFile}
-                onOpenProjects={() => setActiveNav('projects')}
-              />
-            ) : (activeTool as string) === 'perspective_playboard' ? (
-              <PerspectivePlayboard
-                optimizeImageFile={optimizeImageFile}
-                onOpenProjects={() => setActiveNav('projects')}
-              />
-            ) : (
-            <>
-              {/* Tool-Specific Configuration Panel for Tool 2: Subject Swapping */}
-                {activeTool === 'subject_swapping' && (
-                  <div className="glass-panel rounded-2xl p-5 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
-                      <div>
-                        <h2 className="font-display text-sm sm:text-base font-bold text-white">
-                          Subject Swapping Configuration
-                        </h2>
-                        <p className="text-xs text-zinc-400">
-                          Choose the replacement subject identity from your saved profiles or upload 1–5 photos of the replacement subject.
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1 p-1 bg-black/40 border border-white/[0.08] rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => setSwapSubjectSource('saved')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                            swapSubjectSource === 'saved'
-                              ? 'bg-[#f5c518] text-black font-bold'
-                              : 'text-zinc-400 hover:text-white'
-                          }`}
-                        >
-                          Saved Subject Profile
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSwapSubjectSource('upload')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                            swapSubjectSource === 'upload'
-                              ? 'bg-[#f5c518] text-black font-bold'
-                              : 'text-zinc-400 hover:text-white'
-                          }`}
-                        >
-                          Upload Subject Photos (1–5)
-                        </button>
-                      </div>
-                    </div>
-
-                    {swapSubjectSource === 'saved' ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-3.5 rounded-xl glass-card space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-white">
-                              Replacement Subject Profile
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setActiveNav('profiles')}
-                              className="text-xs text-[#f5c518] hover:underline font-medium cursor-pointer"
-                            >
-                              Manage Profiles
-                            </button>
-                          </div>
-                          <select
-                            value={activeProfile.id}
-                            onChange={(e) => {
-                              const found = StorageService.getProfileById(e.target.value);
-                              if (found) handleSelectProfile(found);
-                            }}
-                            className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-[#f5c518]"
-                          >
-                            {StorageService.getProfiles().map((p) => (
-                              <option key={p.id} value={p.id} className="bg-[#0e111a]">
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-[11px] text-zinc-400 line-clamp-2">
-                            {activeProfile.masterSubject}
-                          </p>
-                        </div>
-
-                        <div className="p-3.5 rounded-xl glass-card space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-white">
-                              Optional Outfit Override
-                            </span>
-                            <span className="text-[11px] text-zinc-400">
-                              Or keep scanned clothing below
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={activeOutfit.id}
-                              onChange={(e) => {
-                                const found = StorageService.getOutfitById(e.target.value);
-                                if (found) setActiveOutfit(found);
-                              }}
-                              className="flex-1 bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs text-white font-semibold outline-none focus:border-[#f5c518]"
-                            >
-                              {StorageService.getOutfits().map((o) => (
-                                <option key={o.id} value={o.id} className="bg-[#0e111a]">
-                                  {o.name}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => handleSelectOutfit(activeOutfit)}
-                              disabled={!components}
-                              className="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-[#f5c518] border border-[#f5c518]/30 text-xs font-bold transition disabled:opacity-40 shrink-0 cursor-pointer"
-                            >
-                              Apply Outfit
-                            </button>
-                          </div>
-                          <p className="text-[11px] text-zinc-400 line-clamp-2">
-                            {activeOutfit.description}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl glass-card space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white">
-                            Upload Replacement Subject Photos ({swapSubjectImages.length}/5)
-                          </span>
-                          <input
-                            type="file"
-                            ref={swapSubjectFileRef}
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            onChange={handleSwapSubjectFiles}
-                          />
-                          {swapSubjectImages.length < 5 && (
-                            <button
-                              type="button"
-                              onClick={() => swapSubjectFileRef.current?.click()}
-                              className="text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
-                            >
-                              <Upload className="w-3.5 h-3.5" />
-                              <span>Select Photos</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {swapSubjectImages.length > 0 && (
-                          <div className="grid grid-cols-5 gap-2">
-                            {swapSubjectImages.map((img) => (
-                              <div
-                                key={img.id}
-                                className="relative aspect-square rounded-lg overflow-hidden bg-black border border-white/15"
-                              >
-                                <img
-                                  src={img.previewUrl}
-                                  alt="Subject"
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setSwapSubjectImages((prev) =>
-                                      prev.filter((i) => i.id !== img.id)
-                                    )
-                                  }
-                                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/80 text-white text-xs flex items-center justify-center cursor-pointer"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {swapSubjectImages.length > 0 && (
-                          <button
-                            type="button"
-                            disabled={isAnalyzingSwapSubject}
-                            onClick={handleAnalyzeSwapSubjectPhotos}
-                            className="w-full py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
-                          >
-                            {isAnalyzingSwapSubject ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Consolidating Subject Identity...</span>
-                              </>
-                            ) : (
-                              <span>Extract & Apply Replacement Subject</span>
-                            )}
-                          </button>
-                        )}
-
-                        {swapSubjectError && (
-                          <p className="text-xs text-red-400">{swapSubjectError}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Single Reference Image Upload Zone with Optical Viewfinder */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <label className="font-display text-xs sm:text-sm font-bold text-white">
-                        {activeTool === 'subject_swapping'
-                          ? 'Target Scene / Pose Reference Image (1 Image)'
-                          : 'Reference Image to Analyze (1 Image)'}
-                      </label>
-                    </div>
-
-                    {referenceImage && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReferenceImage(null);
-                          setComponents(null);
-                          setOriginalComponents(null);
-                          setGeneratedMasterPrompt(null);
-                        }}
-                        className="text-xs text-zinc-400 hover:text-white cursor-pointer"
-                      >
-                        Remove image
-                      </button>
-                    )}
-                  </div>
-
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsDragging(true);
-                    }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={handleFileDrop}
-                    onClick={() => !referenceImage && fileInputRef.current?.click()}
-                    className={`relative rounded-2xl border-2 border-dashed p-5 sm:p-7 text-center transition-all ${
-                      isDragging
-                        ? 'border-[#f5c518] bg-[#f5c518]/5 scale-[0.99]'
-                        : !referenceImage
-                        ? 'border-white/15 glass-panel hover:border-[#f5c518]/50 cursor-pointer'
-                        : 'border-white/10 glass-panel'
-                    }`}
-                  >
-                    {!referenceImage ? (
-                      <div className="flex flex-col items-center gap-2.5 text-zinc-400 py-2">
-                        <div className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-[#f5c518]">
-                          <Upload className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <span className="font-display font-bold text-white text-sm sm:text-base">
-                            Upload or drop one reference image
-                          </span>
-                          <span className="text-zinc-400 text-xs block mt-0.5">
-                            Supports JPEG, PNG, WebP • Or paste directly with Ctrl + V
-                          </span>
-                        </div>
-                        <div className="mt-1">
-                          <span className="text-xs font-semibold text-[#f5c518] underline">
-                            Browse file from device
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        className="flex flex-col sm:flex-row items-center gap-5 text-left"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="w-full sm:w-56 shrink-0">
-                          <ReferenceViewfinder
-                            imageUrl={referenceImage.previewUrl}
-                            imageName={referenceImage.name || 'Uploaded Reference'}
-                            aspectRatioLabel={outputRatio}
-                            toolBadgeLabel={
-                              activeTool === 'subject_swapping'
-                                ? 'Target Scene Reference'
-                                : '13-Component Reference'
-                            }
-                            isScanning={isScanning}
-                            compact
-                          />
-                        </div>
-
-                        <div className="flex-1 space-y-3">
-                          <div>
-                            <div className="text-xs font-mono font-semibold text-[#f5c518] tracking-wide">
-                              {activeTool === 'subject_swapping'
-                                ? 'Scene & Pose Reference · Identity Lock Ready'
-                                : 'Optical Source · 13-Component Extraction'}
-                            </div>
-                            <div className="font-display text-sm sm:text-base font-bold text-white truncate mt-0.5">
-                              {referenceImage.name || 'Uploaded Reference Image'}
-                            </div>
-                            <div className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                              Click the viewfinder preview to open the fullscreen optical lightbox or toggle the 3×3 rule-of-thirds and center crosshair grid.
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <button
-                              type="button"
-                              onClick={handleScanReference}
-                              disabled={isScanning}
-                              className="min-h-[42px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ffe169] via-[#f5c518] to-[#d49a00] hover:brightness-105 text-black font-black text-xs uppercase tracking-wider shadow-md transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                            >
-                              <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                              <span>
-                                {components ? 'Re-Analyze Image' : 'Analyze Reference Image'}
-                              </span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={isScanning}
-                              className="min-h-[42px] px-4 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 text-xs font-semibold border border-white/10 transition cursor-pointer"
-                            >
-                              Replace Image
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Scanning Progress Panel */}
-                {isScanning && (
-                  <div className="py-4">
-                    <ScanProgressPanel
-                      currentStageIndex={scanStageIndex}
-                      fallbackNotice={fallbackNotice}
-                    />
-                  </div>
-                )}
-
-                {/* Scan Error Notice */}
-                {scanError && (
-                  <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/40 text-red-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="font-bold text-red-300">Analysis Notice</div>
-                      <div className="text-zinc-300 mt-0.5">{scanError}</div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleScanReference}
-                      className="px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs shrink-0 flex items-center gap-1.5 transition cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Retry Analysis</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Fix 4: Clear Error Card when < 3 components are visible after repair */}
-                {lowVisibilityError && !isScanning && (
-                  <div className="p-4 sm:p-5 rounded-2xl bg-red-950/50 border border-red-500/50 text-red-100 text-xs space-y-3 shadow-xl">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <div className="font-bold text-red-200 text-sm">
-                          Incomplete Scan Result ({lowVisibilityError.visibleCount}/13 Visible Components)
-                        </div>
-                        <p className="text-zinc-300 leading-relaxed">
-                          {lowVisibilityError.reason}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={handleScanReference}
-                        className="px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Retry</span>
-                      </button>
-                      {multiCanonicalSnapshot && multiCanonicalSnapshot.visibleCount >= 3 && (
-                        <button
-                          type="button"
-                          onClick={handleConsiderAllSubjects}
-                          className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-bold text-xs transition cursor-pointer"
-                        >
-                          Use multi-subject result
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLowVisibilityError(null);
-                          if (components) {
-                            const manualComps = { ...components };
-                            for (const k of ALL_COMPONENT_KEYS) {
-                              if (manualComps[k]?.state === 'unavailable') {
-                                manualComps[k] = {
-                                  ...manualComps[k],
-                                  state: 'edited',
-                                  visibility: 'visible',
-                                };
-                              }
-                            }
-                            setComponents(manualComps);
-                          }
-                        }}
-                        className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 font-semibold text-xs transition cursor-pointer"
-                      >
-                        Continue manually
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* PART 1: ON-SCREEN SCAN DEBUG PANEL (Phone Friendly, outside prompt output) */}
-                {isDebugEnabled && scanDebugReport && (
-                  <div className="rounded-2xl bg-[#0a0d14] border border-emerald-500/40 overflow-hidden shadow-xl text-xs font-mono">
-                    <div className="px-4 py-3 bg-emerald-950/40 border-b border-emerald-500/30 flex flex-wrap items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsDebugPanelOpen((prev) => !prev)}
-                        className="flex items-center gap-2 text-emerald-300 font-bold text-left cursor-pointer"
-                      >
-                        <Bug className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>
-                          On-Screen Scan Debug · HTTP {scanDebugReport.httpStatus} ·{' '}
-                          {scanDebugReport.modelUsed}
-                        </span>
-                        {isDebugPanelOpen ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleCopyDebugReport}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-sans font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
-                      >
-                        {debugCopyFeedback ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Copied Debug Report</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copy debug report</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {isDebugPanelOpen && (
-                      <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto text-[11px] text-zinc-300">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <div className="p-2 rounded-lg bg-black/50 border border-white/10">
-                            <div className="text-zinc-500">HTTP / Model</div>
-                            <div className="text-white font-bold truncate">
-                              {scanDebugReport.httpStatus} · {scanDebugReport.modelUsed}
-                            </div>
-                          </div>
-                          <div className="p-2 rounded-lg bg-black/50 border border-white/10">
-                            <div className="text-zinc-500">finishReason / Length</div>
-                            <div className="text-white font-bold">
-                              {scanDebugReport.finishReason} ({scanDebugReport.responseLength} chars)
-                            </div>
-                          </div>
-                          <div className="p-2 rounded-lg bg-black/50 border border-white/10">
-                            <div className="text-zinc-500">JSON Parse / Repair</div>
-                            <div className="text-white font-bold">
-                              ok={String(scanDebugReport.jsonParseSucceeded)} · repaired=
-                              {String(scanDebugReport.jsonRepaired)}
-                            </div>
-                          </div>
-                          <div className="p-2 rounded-lg bg-black/50 border border-white/10">
-                            <div className="text-zinc-500">Quota Fallback / Repair Call</div>
-                            <div className="text-white font-bold">
-                              quota={String(scanDebugReport.quotaFallback)} · repairPass=
-                              {String(scanDebugReport.truncationRepairTriggered)}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5 bg-black/40 p-3 rounded-xl border border-white/10">
-                          <div>
-                            <span className="text-zinc-500">Top-Level Keys: </span>
-                            <span className="text-emerald-300">
-                              [{scanDebugReport.topLevelKeys.join(', ')}]
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500">Subjects ({scanDebugReport.subjects.length}): </span>
-                            <span className="text-amber-300">
-                              {scanDebugReport.subjects
-                                .map((s) => `${s.id}: "${s.label}" (${s.prominence})`)
-                                .join(' | ')}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500">Shared Bucket Keys: </span>
-                            <span className="text-zinc-200">
-                              [{scanDebugReport.bucketKeysFound.shared.join(', ')}]
-                            </span>
-                          </div>
-                          {Object.entries(scanDebugReport.bucketKeysFound.perSubject).map(
-                            ([sid, keys]) => (
-                              <div key={sid}>
-                                <span className="text-zinc-500">
-                                  Person Bucket [{sid}] Keys:{' '}
-                                </span>
-                                <span className="text-zinc-200">[{(keys as string[]).join(', ')}]</span>
-                              </div>
-                            )
-                          )}
-                          <div>
-                            <span className="text-zinc-500">Flat Components Keys: </span>
-                            <span className="text-zinc-200">
-                              [{scanDebugReport.bucketKeysFound.flatComponents.join(', ')}]
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="text-zinc-400 font-bold">
-                            14 Component Visibility Decisions & Reasons:
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            {scanDebugReport.decisions.map((d) => (
-                              <div
-                                key={d.key}
-                                className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${
-                                  d.visibility === 'unavailable'
-                                    ? 'bg-red-950/30 border-red-500/30 text-red-200'
-                                    : 'bg-emerald-950/20 border-emerald-500/20 text-emerald-200'
-                                }`}
-                              >
-                                <span className="font-bold">
-                                  {d.key} <span className="text-zinc-400">({d.bucket})</span>
-                                </span>
-                                <span className="text-right">
-                                  {d.visibility} · <span className="underline">{d.reason}</span> (
-                                  {d.textLength}c)
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="text-zinc-400 font-bold">
-                            Raw Model Response Preview (first 1500 chars):
-                          </div>
-                          <pre className="p-2.5 rounded-xl bg-black/70 border border-white/10 text-[10px] text-zinc-300 whitespace-pre-wrap break-all max-h-44 overflow-y-auto">
-                            {scanDebugReport.rawModelTextPreview}
-                          </pre>
-                        </div>
-
-                        {scanDebugReport.soloDebug && (
-                          <div className="space-y-1.5 pt-2 border-t border-white/10">
-                            <div className="text-amber-300 font-bold">
-                              /api/reanalyze-solo Debug · HTTP {scanDebugReport.soloDebug.httpStatus}{' '}
-                              · {scanDebugReport.soloDebug.modelUsed} · finishReason=
-                              {scanDebugReport.soloDebug.finishReason} · visible=
-                              {scanDebugReport.soloDebug.visibleCount}/13 · fallbackToStoredMulti=
-                              {String(scanDebugReport.soloDebug.fallbackToStoredMultiUsed)}
-                            </div>
-                            <pre className="p-2.5 rounded-xl bg-black/70 border border-white/10 text-[10px] text-zinc-300 whitespace-pre-wrap break-all max-h-44 overflow-y-auto">
-                              {scanDebugReport.soloDebug.rawModelTextPreview}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ANALYSIS RESULTS & 13-COMPONENT COLLAPSIBLE ACCORDION GROUPS */}
-                {components && !isScanning && (
-                  <div className="space-y-6 pt-4 border-t border-white/[0.08] animate-in fade-in duration-300">
-                    {/* Solo Mode Leak Warning & One-Tap Rewrite Action */}
-                    {soloRewriteWarning && (
-                      <div className="p-4 rounded-2xl bg-amber-950/60 border border-amber-500/60 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl">
-                        <div className="flex items-start gap-3">
-                          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                          <div>
-                            <div className="font-bold text-amber-300 text-sm">
-                              Solo Mode Field Alignment Notice
-                            </div>
-                            <p className="text-zinc-300 text-xs mt-0.5 leading-relaxed">
-                              {soloRewriteWarning}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleRewriteFieldsSolo}
-                          disabled={isRewritingFields}
-                          className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
-                        >
-                          {isRewritingFields ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-black" />
-                          ) : (
-                            <Sparkles className="w-4 h-4 text-black" />
-                          )}
-                          <span>Rewrite for Solo</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Results Top Header Bar */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 glass-panel p-4 sm:p-5 rounded-2xl">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="font-display font-bold text-white text-sm sm:text-base">
-                            13-Component Visual Analysis
-                          </span>
-                          <span className="text-zinc-600" aria-hidden="true">
-                            ·
-                          </span>
-                          <span className="text-[#f5c518] font-medium">
-                            {activeTool === 'general_extractor'
-                              ? 'General Prompt Extractor'
-                              : 'Subject Swapping'}
-                          </span>
-                          <span className="text-zinc-600" aria-hidden="true">
-                            ·
-                          </span>
-                          <span className="font-mono text-zinc-400 tabular-nums">
-                            {componentCounts.locked} Locked · {componentCounts.edited} Edited ·{' '}
-                            {componentCounts.ignored} Ignored · {componentCounts.unavailable}{' '}
-                            Unavailable
-                          </span>
-                        </div>
-                        {scanSummary && <p className="text-xs text-zinc-400">{scanSummary}</p>}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        {detectedSubjects.length >= 2 && (
-                          <button
-                            type="button"
-                            onClick={() => setIsMultiSubjectModalOpen(true)}
-                            className="min-h-[36px] px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Users className="w-3.5 h-3.5 text-amber-400" />
-                            <span>Change decision ({activeSubjectDecision === 'solo' ? 'Solo' : 'All'})</span>
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => setIsChecklistStepOpen(true)}
-                          className="min-h-[36px] px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30 transition flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <ListChecks className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Edit selection ({tickedComponentKeys.length}/13)</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleRestoreAllOriginal}
-                          className="min-h-[36px] px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 text-xs font-semibold border border-white/10 transition flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Restore All Original</span>
-                        </button>
-
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="text"
-                            value={projectTitleInput}
-                            onChange={(e) => setProjectTitleInput(e.target.value)}
-                            placeholder="Project title..."
-                            className="bg-black/40 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-1.5 text-xs text-white outline-none w-36 sm:w-44"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleSaveBlueprint}
-                            className="min-h-[36px] flex items-center gap-1.5 px-3.5 py-1.5 bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs rounded-xl transition cursor-pointer"
-                          >
-                            <BookmarkPlus className="w-3.5 h-3.5" />
-                            <span>Save Project</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {savedBlueprintNotice && (
-                      <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-                        <Check className="w-4 h-4 text-emerald-400" />
-                        <span>{savedBlueprintNotice}</span>
-                      </div>
-                    )}
-
-                    {/* Two-Column Desktop Layout: Left Optical Viewfinder + Right 4 Accordion Groups */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">
-                      {/* Left Column: Reference Viewfinder & Aspect Ratio (4 cols) */}
-                      <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-20">
-                        {referenceImage && (
-                          <ReferenceViewfinder
-                            imageUrl={referenceImage.previewUrl}
-                            imageName={referenceImage.name || 'Analyzed Reference'}
-                            aspectRatioLabel={outputRatio}
-                            toolBadgeLabel={
-                              activeTool === 'subject_swapping'
-                                ? 'Subject Swap Scene Source'
-                                : '13-Component Optical Source'
-                            }
-                            isScanning={isScanning}
-                          />
-                        )}
-
-                        {/* Aspect Ratio Selector */}
-                        <div className="glass-panel p-4 rounded-2xl space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <label className="font-display text-xs font-bold text-white">
-                              Output Aspect Ratio
-                            </label>
-                            <span className="text-xs font-mono font-semibold text-[#f5c518] tabular-nums">
-                              {outputRatio}
-                            </span>
-                          </div>
-                          {ratioExplanation && (
-                            <p className="text-[11px] text-zinc-400 leading-normal">
-                              {ratioExplanation}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9'].map(
-                              (ratio) => (
-                                <button
-                                  key={ratio}
-                                  type="button"
-                                  onClick={() => {
-                                    triggerHaptic();
-                                    setOutputRatio(ratio);
-                                    if (generatedMasterPrompt) setHasUnbuiltChanges(true);
-                                  }}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-semibold tabular-nums transition cursor-pointer ${
-                                    outputRatio === ratio
-                                      ? 'bg-[#f5c518] text-black font-bold'
-                                      : 'bg-white/[0.05] text-zinc-400 hover:text-white border border-white/10'
-                                  }`}
-                                >
-                                  {ratio}
-                                </button>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right Column: 4 Collapsible Accordion Groups for the 13 Component Fields (8 cols) */}
-                      <div className="lg:col-span-8 space-y-4">
-                        {/* Filter & Accordion Group Toolbar */}
-                        <div className="glass-panel rounded-2xl p-3.5 sm:px-4 flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-black/40 border border-white/[0.07]">
-                            {(
-                              [
-                                { id: 'all', label: `All (${ALL_COMPONENT_KEYS.length})` },
-                                { id: 'locked', label: `Locked (${componentCounts.locked})` },
-                                { id: 'edited', label: `Edited (${componentCounts.edited})` },
-                                {
-                                  id: 'ignored',
-                                  label: `Excluded (${
-                                    componentCounts.ignored + componentCounts.unavailable
-                                  })`,
-                                },
-                              ] as const
-                            ).map((tab) => {
-                              const active = sceneFilter === tab.id;
-                              return (
-                                <button
-                                  key={tab.id}
-                                  type="button"
-                                  onClick={() => {
-                                    triggerHaptic();
-                                    setSceneFilter(tab.id);
-                                  }}
-                                  className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap shrink-0 ${
-                                    active
-                                      ? 'text-black font-bold'
-                                      : 'text-zinc-400 hover:text-white'
-                                  }`}
-                                >
-                                  {active && (
-                                    <motion.div
-                                      layoutId="sceneFilterPill"
-                                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                                      className="absolute inset-0 rounded-lg bg-[#f5c518]"
-                                    />
-                                  )}
-                                  <span className="relative z-10 font-mono tabular-nums">
-                                    {tab.label}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenSceneGroups({
-                                  identity_pose: true,
-                                  camera_framing: true,
-                                  wardrobe_scene: true,
-                                  expression_gestures: true,
-                                })
-                              }
-                              className="px-2.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-zinc-300 font-semibold transition cursor-pointer whitespace-nowrap"
-                            >
-                              Expand Groups
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenSceneGroups({
-                                  identity_pose: false,
-                                  camera_framing: false,
-                                  wardrobe_scene: false,
-                                  expression_gestures: false,
-                                })
-                              }
-                              className="px-2.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-zinc-300 font-semibold transition cursor-pointer whitespace-nowrap"
-                            >
-                              Collapse Groups
-                            </button>
-                          </div>
-                        </div>
-
-                        {SCENE_ACCORDION_GROUPS.map((group) => {
-                          const filteredKeys = group.keys.filter((k) => {
-                            const c = components[k];
-                            if (!c) return false;
-                            if (sceneFilter === 'all') return true;
-                            if (sceneFilter === 'locked') return c.state === 'locked';
-                            if (sceneFilter === 'edited') return c.state === 'edited';
-                            if (sceneFilter === 'ignored')
-                              return c.state === 'ignored' || c.state === 'unavailable';
-                            return true;
-                          });
-
-                          if (filteredKeys.length === 0) return null;
-
-                          const isGroupOpen = openSceneGroups[group.id] !== false;
-                          const activeInGroup = group.keys.filter((k) => {
-                            const st = components[k]?.state;
-                            return st === 'locked' || st === 'edited';
-                          }).length;
-                          const editedInGroup = group.keys.filter(
-                            (k) => components[k]?.state === 'edited'
-                          ).length;
-
-                          return (
-                            <div
-                              key={group.id}
-                              className="glass-panel rounded-2xl overflow-hidden transition-all"
-                            >
-                              {/* Accordion Group Header */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  triggerHaptic();
-                                  setOpenSceneGroups((prev) => ({
-                                    ...prev,
-                                    [group.id]: !isGroupOpen,
-                                  }));
-                                }}
-                                className="w-full px-4 py-3.5 sm:px-5 sm:py-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.03] transition cursor-pointer select-none"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className="px-2 py-0.5 rounded-md bg-[#f5c518]/15 border border-[#f5c518]/30 text-[11px] font-mono font-bold text-[#f5c518] tabular-nums">
-                                      {group.codes}
-                                    </span>
-                                    <span className="font-display font-bold text-sm sm:text-base text-white">
-                                      {group.title}
-                                    </span>
-                                    <span className="text-zinc-600">·</span>
-                                    <span className="text-xs font-mono text-zinc-400 tabular-nums">
-                                      {activeInGroup}/{group.keys.length} Active
-                                      {editedInGroup > 0 ? ` · ${editedInGroup} Edited` : ''}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-zinc-400 mt-0.5 truncate">
-                                    {group.subtitle}
-                                  </p>
-                                </div>
-
-                                <div className="w-8 h-8 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-zinc-300 shrink-0">
-                                  {isGroupOpen ? (
-                                    <ChevronUp className="w-4 h-4 text-[#f5c518]" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4" />
-                                  )}
-                                </div>
-                              </button>
-
-                              {/* Accordion Group Body */}
-                              <AnimatePresence initial={false}>
-                                {isGroupOpen && (
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                                    className="overflow-hidden border-t border-white/[0.07]"
-                                  >
-                                    <div className="p-3.5 sm:p-4 space-y-3">
-                                      {filteredKeys.map((key) => {
-                                        const comp = components[key];
-                                        if (!comp) return null;
-
-                                        return (
-                                          <ComponentCard
-                                            key={key}
-                                            componentKey={key}
-                                            component={comp}
-                                            isUserControlled={
-                                              activeTool === 'subject_swapping' &&
-                                              (key === 'subject' || key === 'body')
-                                            }
-                                            onUpdateState={(st) =>
-                                              handleUpdateComponentState(key, st)
-                                            }
-                                            onUpdateText={(txt, meta) =>
-                                              handleUpdateComponentText(key, txt, meta)
-                                            }
-                                            onApplyBackgroundBundle={
-                                              key === 'background' ||
-                                              key === 'environment' ||
-                                              key === 'lighting'
-                                                ? handleApplyBackgroundBundle
-                                                : undefined
-                                            }
-                                            defaultExpanded={
-                                              key === 'subject' ||
-                                              key === 'pose' ||
-                                              key === 'facial_expression' ||
-                                              key === 'clothing'
-                                            }
-                                          />
-                                        );
-                                      })}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Prominent GENERATE FINAL PROMPT Button */}
-                    <div className="pt-2 pb-2">
-                      <div className="rounded-2xl glass-panel p-5 sm:p-6 text-center space-y-3">
-                        <div className="max-w-xl mx-auto space-y-1">
-                          <h3 className="font-display text-base sm:text-lg font-bold text-white tracking-tight">
-                            {generatedMasterPrompt
-                              ? 'Update Final Prompt from Current Fields'
-                              : 'Generate Final Prompt'}
-                          </h3>
-                          <p className="text-xs text-zinc-400">
-                            Synthesizes a coherent, image-model-oriented prompt strictly from the current contents of your active component fields. Removed, ignored, and unavailable components are excluded.
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleGenerateFinalPrompt}
-                          className="w-full sm:w-auto min-w-[280px] px-8 py-4 rounded-xl bg-gradient-to-r from-[#ffe169] via-[#f5c518] to-[#d49a00] hover:brightness-105 active:scale-[0.99] text-black font-black text-sm uppercase tracking-wider shadow-lg shadow-amber-500/15 transition-all inline-flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <Sparkles className="w-4 h-4 text-black stroke-[2.5]" />
-                          <span>Generate Final Prompt</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Unbuilt Changes Banner */}
-                    {hasUnbuiltChanges && generatedMasterPrompt && (
-                      <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div>
-                          <span className="font-bold text-amber-300">
-                            Component fields or tool controls were modified.
-                          </span>
-                          <span className="text-zinc-300 ml-1">
-                            Click "Generate Final Prompt" to refresh the output with your latest changes.
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleGenerateFinalPrompt}
-                          className="px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs shrink-0 flex items-center gap-1.5 transition cursor-pointer"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Generate Final Prompt</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Final Generated Prompt Output Section */}
-                    {generatedMasterPrompt && (
-                      <div className="pt-4 border-t border-white/[0.08] space-y-4 w-full animate-in fade-in duration-200">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                          <div>
-                            <h3 className="font-display text-sm sm:text-base font-bold text-white">
-                              Final Generated Prompt
-                            </h3>
-                            <p className="text-xs text-zinc-400">
-                              Constructed strictly from your current active components and edits.
-                            </p>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-3">
-                            <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={showNegativePrompt}
-                                onChange={(e) => setShowNegativePrompt(e.target.checked)}
-                                className="accent-[#f5c518]"
-                              />
-                              <span>Show Negative Prompt</span>
-                            </label>
-
-                            <div className="flex items-center gap-2">
-                              <label className="text-xs text-zinc-400 font-semibold">Format:</label>
-                              <select
-                                value={targetModel}
-                                onChange={(e) => setTargetModel(e.target.value as TargetModelType)}
-                                className="bg-white/[0.06] text-white border border-white/15 rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
-                              >
-                                <option value="universal" className="bg-[#0e111a]">
-                                  Universal / Standard
-                                </option>
-                                <option value="flux" className="bg-[#0e111a]">
-                                  Flux
-                                </option>
-                                <option value="gemini" className="bg-[#0e111a]">
-                                  Google Gemini
-                                </option>
-                                <option value="chatgpt" className="bg-[#0e111a]">
-                                  ChatGPT / DALL-E
-                                </option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-
-                        {promptCheck && (
-                          <PromptCheckBanner
-                            check={promptCheck}
-                            onApplyFix={handleApplySafetyFix}
-                          />
-                        )}
-
-                        <textarea
-                          readOnly
-                          value={exportedPrompt}
-                          rows={14}
-                          className="w-full glass-panel text-white p-4 rounded-2xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-[#f5c518] selection:text-black shadow-inner resize-y min-h-[240px]"
-                        />
-
-                        {showNegativePrompt && generatedNegativePrompt && (
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-zinc-400">
-                              Optional Negative Prompt (Excludes unsupported or cropped anatomy)
-                            </label>
-                            <textarea
-                              value={generatedNegativePrompt}
-                              onChange={(e) => setGeneratedNegativePrompt(e.target.value)}
-                              rows={2}
-                              className="w-full glass-panel text-zinc-300 p-3 rounded-xl text-xs font-mono leading-relaxed outline-none"
-                            />
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <button
-                            type="button"
-                            onClick={handleCopyPrompt}
-                            className="py-3 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer"
-                          >
-                            {copyFeedback ? (
-                              <>
-                                <Check className="w-4 h-4 text-black" />
-                                <span>Copied to Clipboard</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-4 h-4" />
-                                <span>Copy Final Prompt</span>
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleDownloadPrompt}
-                            className="py-3 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-white font-bold text-xs transition flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
-                          >
-                            <Download className="w-4 h-4 text-sky-400" />
-                            <span>Download Prompt (.txt)</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleSaveBlueprint}
-                            className="py-3 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 font-bold text-xs transition flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
-                          >
-                            <BookmarkPlus className="w-4 h-4 text-[#f5c518]" />
-                            <span>Save to Projects</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Floating Animated Prompt Compilation Dock */}
-                    <FloatingPromptDock
-                      toolLabel={
-                        activeTool === 'general_extractor'
-                          ? 'General Prompt Extractor'
-                          : 'Subject Swapping'
-                      }
-                      activeCount={componentCounts.locked + componentCounts.edited}
-                      totalCount={ALL_COMPONENT_KEYS.length}
-                      editedCount={componentCounts.edited}
-                      outputRatio={outputRatio}
-                      hasUnbuiltChanges={hasUnbuiltChanges}
-                      generatedPrompt={generatedMasterPrompt}
-                      exportedPrompt={exportedPrompt}
-                      targetModel={targetModel}
-                      onSetTargetModel={setTargetModel}
-                      onGeneratePrompt={handleGenerateFinalPrompt}
-                      onCopyPrompt={handleCopyPrompt}
-                      onDownloadPrompt={handleDownloadPrompt}
-                      onSaveProject={handleSaveBlueprint}
-                      copyFeedback={copyFeedback}
-                      negativePrompt={generatedNegativePrompt}
-                      showNegativePrompt={showNegativePrompt}
-                      onToggleNegativePrompt={setShowNegativePrompt}
-                      onChangeNegativePrompt={setGeneratedNegativePrompt}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </motion.div>
-        )}
-
-        {/* TAB 2: PROFILES */}
-        {activeNav === 'profiles' && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <ProfileManager
-              activeProfileId={activeProfile.id}
-              onSelectProfile={handleSelectProfile}
-              activeOutfitId={activeOutfit.id}
-              onSelectOutfit={handleSelectOutfit}
-            />
-          </motion.div>
-        )}
-
-        {/* TAB 3: PROJECTS */}
-        {activeNav === 'projects' && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <BlueprintProjects onLoadBlueprint={handleLoadBlueprint} />
-          </motion.div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/[0.07] bg-[#06070b]/80 backdrop-blur-xl py-6 px-4 text-center text-xs text-zinc-500">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-display font-bold text-zinc-300">My Whisk AI</span>
-            <span aria-hidden="true">·</span>
-            <span>Spatial Visual Prompt & Reference Control Studio</span>
-          </div>
-
-          <div className="text-[11px] font-mono text-zinc-500">
-            Local-first profiles & projects storage
-          </div>
-        </div>
-      </footer>
-
-      {/* Quota Fallback Persistent Amber Banner */}
-      {isQuotaFallback && !quotaFallbackAcknowledged && (
-        <div className="mb-4 p-4 rounded-2xl bg-amber-950/50 border border-amber-500/50 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <div className="font-bold text-amber-300 text-sm">
-                Estimated blueprint, not an AI analysis
-              </div>
-              <p className="text-zinc-300 text-xs mt-0.5 leading-relaxed">
-                Your AI service quota has been reached. A template blueprint was initialized based on reference image geometry. You may edit any field or acknowledge to continue.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setQuotaFallbackAcknowledged(true)}
-            className="px-4 py-2 rounded-xl bg-amber-500 text-black font-bold text-xs hover:bg-amber-400 transition shrink-0 cursor-pointer"
-          >
-            Acknowledge & Continue
-          </button>
-        </div>
-      )}
-
-      {/* PHASE 2: Multi-Subject Decision Modal */}
-      <AnimatePresence>
-        {isMultiSubjectModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg bg-[#0e1017] border border-white/15 rounded-2xl p-6 shadow-2xl space-y-5"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-white">
-                      Multiple Subjects Detected ({detectedSubjects.length})
-                    </h3>
-                    <p className="text-xs text-zinc-400">
-                      Choose how to structure the prompt blueprint:
-                    </p>
-                  </div>
-                </div>
+              {detectedSubjects.map((subject) => (
                 <button
+                  key={subject.id}
                   type="button"
-                  onClick={() => setIsMultiSubjectModalOpen(false)}
-                  className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white"
+                  onClick={() => handleSelectSoloSubject(subject.id)}
+                  className="w-full min-h-[52px] p-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition flex items-center justify-between gap-3 cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={handleConsiderAllSubjects}
-                  className="w-full p-4 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/10 hover:from-amber-500/30 hover:to-amber-600/20 border border-amber-500/40 text-left transition space-y-1 group"
-                >
-                  <div className="flex items-center justify-between font-bold text-sm text-amber-300">
-                    <span>Consider all subjects in scene</span>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/30">
-                      Multi-Subject Mode
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-400">
-                    Analyzes interactions, positional layout, and keep descriptions for all detected individuals.
-                  </p>
-                </button>
-
-                <div className="text-xs font-semibold text-zinc-400 pt-1">
-                  Or isolate a single subject (Solo Mode):
-                </div>
-
-                {detectedSubjects.map((subject) => (
-                  <button
-                    key={subject.id}
-                    type="button"
-                    onClick={() => handleSelectSoloSubject(subject.id)}
-                    className="w-full p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center font-bold text-xs text-amber-400 border border-white/10">
-                        {subject.id}
-                      </div>
-                      <div>
-                        <div className="font-bold text-xs text-white">{subject.label}</div>
-                        <div className="text-[11px] text-zinc-400 capitalize">{subject.prominence} subject</div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-[#161b28] flex items-center justify-center font-bold text-xs text-[#f5c518] border border-white/10 shrink-0">
+                      {subject.id}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-xs text-white truncate">{subject.label}</div>
+                      <div className="text-[11px] text-zinc-400 capitalize">
+                        {subject.prominence} subject
                       </div>
                     </div>
-                    <span className="text-xs font-semibold text-[#f5c518] group-hover:translate-x-0.5 transition-transform">
-                      Keep only Subject {subject.id} &rarr;
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                  </div>
+                  <span className="text-xs font-semibold text-[#f5c518] shrink-0">
+                    Keep Subject {subject.id}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </BottomSheet>
 
-      {/* PHASE 3: Tick-box Component Selection Checklist Step */}
-      <AnimatePresence>
-        {isChecklistStepOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="w-full max-w-2xl max-h-[85vh] bg-[#0e1017] border border-white/15 rounded-2xl p-6 shadow-2xl flex flex-col space-y-4"
-            >
-              <div className="flex items-start justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-400">
-                    <ListChecks className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-white">
-                      Visible & Relevant Component Selection
-                    </h3>
-                    <p className="text-xs text-zinc-400">
-                      Select which extracted components to include in your prompt:
-                    </p>
-                  </div>
-                </div>
+          {/* Tick-box Component Selection Checklist Bottom Sheet */}
+          <BottomSheet
+            isOpen={isChecklistStepOpen}
+            onClose={() => setIsChecklistStepOpen(false)}
+            title="Visible & Relevant Component Selection"
+            subtitle="Choose which extracted components to include in the final prompt"
+            icon={<ListChecks className="w-4 h-4" />}
+            maxWidth="max-w-2xl"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-mono text-zinc-400 tabular-nums">
+                  {tickedComponentKeys.length} / {ALL_COMPONENT_KEYS.length} selected
+                </span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setTickedComponentKeys([...ALL_COMPONENT_KEYS])}
-                    className="px-2.5 py-1 text-xs text-indigo-300 hover:text-white bg-indigo-500/20 rounded-lg transition"
+                    className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-[#f5c518] bg-[#f5c518]/12 hover:bg-[#f5c518]/20 rounded-lg transition cursor-pointer"
                   >
                     Select All
                   </button>
                   <button
                     type="button"
                     onClick={() => setTickedComponentKeys([])}
-                    className="px-2.5 py-1 text-xs text-zinc-400 hover:text-white bg-white/5 rounded-lg transition"
+                    className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-zinc-300 bg-white/[0.06] hover:bg-white/[0.1] rounded-lg transition cursor-pointer"
                   >
                     Select None
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsChecklistStepOpen(false)}
-                    className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white"
-                  >
-                    <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
                 {ALL_COMPONENT_KEYS.map((key) => {
                   const item = components?.[key];
-                  const isUnavailable = item?.state === 'unavailable' || item?.visibility === 'unavailable';
+                  const isUnavailable =
+                    item?.state === 'unavailable' || item?.visibility === 'unavailable';
                   const isPartial = item?.visibility === 'partial';
                   const isChecked = tickedComponentKeys.includes(key);
 
@@ -3479,7 +2532,7 @@ export default function App() {
                       key={key}
                       className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${
                         isChecked
-                          ? 'bg-indigo-950/30 border-indigo-500/40'
+                          ? 'bg-[#f5c518]/10 border-[#f5c518]/40'
                           : 'bg-white/[0.02] border-white/10 hover:bg-white/[0.04]'
                       }`}
                     >
@@ -3487,7 +2540,7 @@ export default function App() {
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => handleToggleChecklistKey(key)}
-                        className="mt-1 accent-indigo-500 w-4 h-4 rounded cursor-pointer"
+                        className="mt-1 accent-[#f5c518] w-4 h-4 rounded cursor-pointer"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
@@ -3495,7 +2548,7 @@ export default function App() {
                             {COMPONENT_LABELS[key]}
                           </span>
                           {isPartial && (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <span className="text-[11px] font-mono text-amber-300">
                               Partial visibility
                             </span>
                           )}
@@ -3510,63 +2563,44 @@ export default function App() {
               </div>
 
               {components && (
-                <div className="text-xs text-zinc-500 font-mono pt-2 border-t border-white/10 flex items-center justify-between">
-                  <span>
-                    {ALL_COMPONENT_KEYS.filter((k) => components[k]?.state === 'unavailable').length} components not visible in this frame (excluded from checklist)
+                <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <span className="text-[11px] font-mono text-zinc-500">
+                    {ALL_COMPONENT_KEYS.filter((k) => components[k]?.state === 'unavailable').length}{' '}
+                    unavailable in frame (excluded)
                   </span>
                   <button
                     type="button"
                     onClick={handleFinishChecklist}
-                    className="px-5 py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer"
+                    className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer"
                   >
                     Continue with Selected Components
                   </button>
                 </div>
               )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </div>
+          </BottomSheet>
 
-      {/* PHASE 4: Contradiction Check Modal */}
-      <AnimatePresence>
-        {isContradictionModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-xl bg-[#0e1017] border border-white/15 rounded-2xl p-6 shadow-2xl space-y-4"
-            >
-              <div className="flex items-start justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400">
-                    <AlertTriangle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-white">
-                      Potential Prompt Contradictions
-                    </h3>
-                    <p className="text-xs text-zinc-400">
-                      Review detected conflicts before generating your prompt:
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsContradictionModalOpen(false)}
-                  className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
+          {/* Contradiction Check Bottom Sheet */}
+          <BottomSheet
+            isOpen={isContradictionModalOpen}
+            onClose={() => setIsContradictionModalOpen(false)}
+            title="Potential Prompt Contradictions"
+            subtitle="Review detected conflicts before compiling your prompt"
+            icon={<AlertTriangle className="w-4 h-4" />}
+            maxWidth="max-w-xl"
+          >
+            <div className="space-y-4">
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                 {contradictionIssues.map((issue) => (
-                  <div key={issue.id} className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 space-y-2">
+                  <div
+                    key={issue.id}
+                    className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 space-y-2"
+                  >
                     <div className="flex items-center justify-between text-xs font-bold text-amber-300">
-                      <span>{issue.labelA} vs {issue.labelB}</span>
-                      <span className="font-mono text-[10px] text-amber-400/80">Conflict</span>
+                      <span>
+                        {issue.labelA} vs {issue.labelB}
+                      </span>
+                      <span className="font-mono text-[11px] text-amber-400/80">Conflict</span>
                     </div>
                     <p className="text-xs text-zinc-300">{issue.explanation}</p>
                     <div className="flex flex-wrap gap-2 pt-1">
@@ -3578,7 +2612,7 @@ export default function App() {
                           }
                           setContradictionIssues((prev) => prev.filter((i) => i.id !== issue.id));
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40"
+                        className="min-h-[38px] px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40 cursor-pointer"
                       >
                         Keep {issue.labelA} (Exclude {issue.labelB})
                       </button>
@@ -3591,7 +2625,7 @@ export default function App() {
                             }
                             setContradictionIssues((prev) => prev.filter((i) => i.id !== issue.id));
                           }}
-                          className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40"
+                          className="min-h-[38px] px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40 cursor-pointer"
                         >
                           Keep {issue.labelB} (Exclude {issue.labelA})
                         </button>
@@ -3601,14 +2635,18 @@ export default function App() {
                 ))}
               </div>
 
-              <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+              <div className="pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5">
                 <button
                   type="button"
                   onClick={handleDeepAiCheck}
                   disabled={isPerformingDeepCheck}
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-white font-semibold text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  {isPerformingDeepCheck ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#f5c518]" /> : <Sparkles className="w-3.5 h-3.5 text-[#f5c518]" />}
+                  {isPerformingDeepCheck ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#f5c518]" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-[#f5c518]" />
+                  )}
                   <span>Deep AI Check</span>
                 </button>
 
@@ -3616,7 +2654,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setIsContradictionModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-semibold text-xs"
+                    className="min-h-[42px] px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 font-semibold text-xs cursor-pointer"
                   >
                     Edit Fields
                   </button>
@@ -3626,19 +2664,17 @@ export default function App() {
                       setIsContradictionModalOpen(false);
                       if (components) buildAndSetFinalPrompt(components);
                     }}
-                    className="px-5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer"
+                    className="min-h-[42px] px-5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer"
                   >
-                    Proceed Anyway & Generate
+                    Proceed &amp; Generate
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </div>
+          </BottomSheet>
 
-      <OfflineIndicator />
-    </>
+          <OfflineIndicator />
+        </>
       )}
     </div>
   );

@@ -43,7 +43,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
     return (
       <button
         onClick={install}
-        className="flex items-center gap-1.5 rounded-full bg-[#f5c518]/15 hover:bg-[#f5c518]/25 text-[#f5c518] border border-[#f5c518]/40 px-3 py-1 text-xs font-semibold shadow-sm transition active:scale-95"
+        className="min-h-[36px] flex items-center gap-1.5 rounded-xl bg-[#f5c518]/15 hover:bg-[#f5c518]/25 text-[#f5c518] border border-[#f5c518]/40 px-3 py-1.5 text-xs font-semibold transition active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
         title="Install My Whisk to Home Screen"
       >
         <Download className="w-3.5 h-3.5" />
@@ -58,10 +58,10 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
       <>
         <button
           onClick={() => setShowIOSGuide(true)}
-          className="flex items-center gap-1.5 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 border border-zinc-700 px-2.5 py-1 text-xs font-medium transition active:scale-95"
+          className="min-h-[36px] flex items-center gap-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/10 px-3 py-1.5 text-xs font-medium transition active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
           title="Install on iPhone / iPad"
         >
-          <Download className="w-3 h-3 text-amber-400" />
+          <Download className="w-3.5 h-3.5 text-[#f5c518]" />
           <span>Install PWA</span>
         </button>
 

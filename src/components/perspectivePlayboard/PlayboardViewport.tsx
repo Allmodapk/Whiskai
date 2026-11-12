@@ -364,30 +364,30 @@ export const PlayboardViewport = forwardRef<PlayboardViewportHandle, PlayboardVi
     }));
 
     return (
-      <div className="flex flex-col rounded-2xl border border-white/10 bg-[#090c14] overflow-hidden">
+      <div className="flex flex-col rounded-2xl border border-white/[0.09] bg-[#090c14] overflow-hidden shadow-2xl">
         {/* Top Toolbar (Outside WebGL overlap, single-line controls) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 bg-[#0e131f] border-b border-white/[0.08]">
-          <div className="flex items-center gap-2 text-xs font-mono text-zinc-200 tabular-nums">
-            <span className="font-semibold text-[#f5c518]">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 bg-[#0e1118] border-b border-white/[0.08]">
+          <div className="flex items-center gap-2 text-xs font-mono text-zinc-200 tabular-nums min-w-0">
+            <span className="font-semibold text-[#f5c518] whitespace-nowrap">
               Az {hudReadout.azimuthDeg > 0 ? `+${hudReadout.azimuthDeg}` : hudReadout.azimuthDeg}°
             </span>
             <span className="text-zinc-600" aria-hidden="true">·</span>
-            <span>
+            <span className="whitespace-nowrap">
               El {hudReadout.elevationDeg > 0 ? `+${hudReadout.elevationDeg}` : hudReadout.elevationDeg}°
             </span>
             <span className="text-zinc-600" aria-hidden="true">·</span>
-            <span>{hudReadout.distanceMeters}m</span>
+            <span className="whitespace-nowrap">{hudReadout.distanceMeters}m</span>
             <span className="text-zinc-600" aria-hidden="true">·</span>
-            <span>{hudReadout.focalLengthMm}mm</span>
+            <span className="whitespace-nowrap">{hudReadout.focalLengthMm}mm</span>
             <span className="text-zinc-600 hidden sm:inline" aria-hidden="true">·</span>
-            <span className="text-zinc-300 hidden sm:inline">{hudReadout.shotSize}</span>
+            <span className="text-zinc-300 hidden sm:inline truncate">{hudReadout.shotSize}</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={() => setShowGrid((prev) => !prev)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`min-h-[38px] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 showGrid
                   ? 'bg-white/10 border-white/20 text-white'
                   : 'bg-transparent border-white/10 text-zinc-400 hover:text-white'
@@ -414,17 +414,17 @@ export const PlayboardViewport = forwardRef<PlayboardViewportHandle, PlayboardVi
                   requestRenderRef.current();
                 }
               }}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-white/10 text-zinc-300 hover:text-white hover:bg-white/[0.06] disabled:opacity-40 transition cursor-pointer whitespace-nowrap shrink-0"
+              className="min-h-[38px] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-white/10 text-zinc-300 hover:text-white hover:bg-white/[0.06] disabled:opacity-40 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               title="Reset camera to default front eye-level view"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset</span>
+              <span className="hidden xs:inline sm:inline">Reset</span>
             </button>
 
             <button
               type="button"
               onClick={onToggleLock}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 isLocked
                   ? 'bg-emerald-500 text-black hover:bg-emerald-400'
                   : 'bg-[#f5c518] text-black hover:bg-[#ffe169]'
@@ -433,7 +433,7 @@ export const PlayboardViewport = forwardRef<PlayboardViewportHandle, PlayboardVi
               {isLocked ? (
                 <>
                   <Unlock className="w-3.5 h-3.5" />
-                  <span>Unlock Frame</span>
+                  <span>Unlock</span>
                 </>
               ) : (
                 <>
@@ -448,7 +448,7 @@ export const PlayboardViewport = forwardRef<PlayboardViewportHandle, PlayboardVi
         {/* Stage Container hosting exact Aspect-Ratio Camera Gate */}
         <div
           ref={stageContainerRef}
-          className="relative w-full h-[380px] sm:h-[480px] lg:h-[540px] bg-[#07090f] flex items-center justify-center p-3 select-none"
+          className="relative w-full h-[44dvh] min-h-[300px] sm:h-[460px] lg:h-[580px] bg-[#07090e] flex items-center justify-center p-2.5 sm:p-3 select-none"
         >
           {webglUnavailable ? (
             <div className="flex flex-col items-center justify-center text-center p-6 max-w-sm space-y-2 text-zinc-300">
@@ -491,7 +491,7 @@ export const PlayboardViewport = forwardRef<PlayboardViewportHandle, PlayboardVi
               )}
 
               {/* Bottom-left static gate label (Solid surface, zero backdrop-filter over WebGL) */}
-              <div className="pointer-events-none absolute bottom-2 left-2 px-2 py-1 rounded bg-[#0c101a]/90 border border-white/10 text-[11px] font-mono text-zinc-200 tabular-nums">
+              <div className="pointer-events-none absolute bottom-2 left-2 px-2 py-1 rounded bg-[#0c101a]/95 border border-white/10 text-[11px] font-mono text-zinc-200 tabular-nums">
                 {aspectRatio} · {gateSize.width}×{gateSize.height}
               </div>
 
@@ -513,13 +513,13 @@ export const PlayboardViewport = forwardRef<PlayboardViewportHandle, PlayboardVi
         </div>
 
         {/* Subtle interaction guide bar below viewport */}
-        <div className="px-3.5 py-2 bg-[#0c1019] border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-400">
+        <div className="px-3.5 py-2 bg-[#0c1018] border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-400">
           <span>
             {isLocked
               ? 'Camera movement locked. Unlock frame to orbit or re-compose.'
-              : 'Drag to orbit camera around fixed subject · Scroll / pinch to dolly · Right-drag / two-finger drag to re-frame target'}
+              : 'Drag to orbit · Scroll or pinch to zoom · Two-finger or right-drag to re-frame'}
           </span>
-          <span className="font-mono text-zinc-500">Subject fixed at (0, 0, 0) facing +Z</span>
+          <span className="font-mono text-zinc-500 hidden sm:inline">Subject anchored at (0, 0, 0) +Z</span>
         </div>
       </div>
     );

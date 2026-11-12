@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { motion } from 'motion/react';
+import { SegmentedTabs, BottomSheet } from './ui/StudioPrimitives';
 import {
   SubjectProfile,
   MasterOutfit,
@@ -628,7 +628,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
   return (
     <div className="space-y-6">
       {/* Sub-navigation bar for the 4 Profile Libraries */}
-      <div className="glass-panel p-4 sm:p-5 rounded-2xl space-y-4">
+      <div className="studio-panel p-4 sm:p-5 rounded-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-base sm:text-lg font-bold text-white tracking-tight">
@@ -683,39 +683,18 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
           </div>
         </div>
 
-        {/* Segmented Category Tabs with Spring Pill */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-black/40 border border-white/[0.08] rounded-xl">
-          {(
-            [
-              { id: 'subjects', label: `Subjects (${profiles.length})`, icon: Users },
-              { id: 'outfits', label: `Outfits (${outfits.length})`, icon: Shirt },
-              { id: 'backgrounds', label: `Backgrounds (${backgrounds.length})`, icon: ImageIcon },
-              { id: 'components', label: `Components (${componentItems.length})`, icon: Layers },
-            ] as const
-          ).map((tab) => {
-            const Icon = tab.icon;
-            const isTabActive = activeSection === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveSection(tab.id)}
-                className={`relative min-h-[40px] px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition whitespace-nowrap cursor-pointer ${
-                  isTabActive ? 'text-black font-bold' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                {isTabActive && (
-                  <motion.div
-                    layoutId="profileSectionPill"
-                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                    className="absolute inset-0 rounded-lg bg-[#f5c518]"
-                  />
-                )}
-                <Icon className="relative z-10 w-3.5 h-3.5" />
-                <span className="relative z-10 font-mono tabular-nums">{tab.label}</span>
-              </button>
-            );
-          })}
+        <div className="overflow-x-auto no-scrollbar">
+          <SegmentedTabs
+            fullWidth
+            value={activeSection}
+            onChange={setActiveSection}
+            options={[
+              { id: 'subjects', label: 'Subjects', count: profiles.length, icon: Users },
+              { id: 'outfits', label: 'Outfits', count: outfits.length, icon: Shirt },
+              { id: 'backgrounds', label: 'Backgrounds', count: backgrounds.length, icon: ImageIcon },
+              { id: 'components', label: 'Components', count: componentItems.length, icon: Layers },
+            ]}
+          />
         </div>
       </div>
 
@@ -728,8 +707,8 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <div
                 key={p.id}
                 onClick={() => onSelectProfile(p)}
-                className={`group rounded-2xl p-5 transition-all cursor-pointer flex flex-col justify-between ${
-                  isActive ? 'glass-card-active' : 'glass-card hover:border-white/20'
+                className={`group rounded-2xl p-5 transition-colors cursor-pointer flex flex-col justify-between ${
+                  isActive ? 'studio-card-active' : 'studio-card hover:border-white/20'
                 }`}
               >
                 <div>
@@ -739,10 +718,12 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                         {p.name}
                       </h3>
                       <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-0.5">
-                        <span>{isActive ? 'Default Active Subject' : 'Click to set default'}</span>
+                        <span className={isActive ? 'text-[#f5c518] font-medium' : ''}>
+                          {isActive ? 'Default Active Subject' : 'Click to set default'}
+                        </span>
                         {(p.tags || []).length > 0 && (
                           <>
-                            <span>·</span>
+                            <span aria-hidden="true">·</span>
                             <span className="truncate">{(p.tags || []).join(' · ')}</span>
                           </>
                         )}
@@ -754,7 +735,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                         src={p.thumbnailUrl}
                         alt={p.name}
                         referrerPolicy="no-referrer"
-                        className="w-12 h-12 rounded-xl object-cover border border-[#262a36] shrink-0"
+                        className="w-12 h-12 rounded-xl object-cover border border-white/10 shrink-0"
                       />
                     )}
                   </div>
@@ -765,7 +746,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 </div>
 
                 <div
-                  className="pt-3 border-t border-[#1f232d] flex items-center justify-between text-xs text-zinc-400"
+                  className="pt-3 border-t border-white/[0.07] flex items-center justify-between text-xs text-zinc-400"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span className="text-[11px] text-zinc-500 tabular-nums">
@@ -777,7 +758,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                       type="button"
                       title="Edit Subject Profile"
                       onClick={() => handleOpenEditSubject(p)}
-                      className="p-1.5 rounded-lg hover:bg-[#202430] hover:text-white transition"
+                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:text-white transition cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -794,7 +775,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                         });
                         reloadAll();
                       }}
-                      className="p-1.5 rounded-lg hover:bg-[#202430] hover:text-white transition"
+                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:text-white transition cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" />
                     </button>
@@ -803,7 +784,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                         type="button"
                         title="Delete Subject Profile"
                         onClick={(e) => handleDeleteSubject(p.id, e)}
-                        className="p-1.5 rounded-lg hover:bg-red-950/60 hover:text-red-400 transition"
+                        className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-red-950/60 hover:text-red-400 transition cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -825,16 +806,14 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <div
                 key={o.id}
                 onClick={() => onSelectOutfit && onSelectOutfit(o)}
-                className={`group rounded-2xl p-5 border transition-all cursor-pointer flex flex-col justify-between ${
-                  isActive
-                    ? 'bg-[#151822] border-[#f5c518]'
-                    : 'bg-[#11131a] border-[#262a36] hover:border-[#3a4052]'
+                className={`group rounded-2xl p-5 transition-colors cursor-pointer flex flex-col justify-between ${
+                  isActive ? 'studio-card-active' : 'studio-card hover:border-white/20'
                 }`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
-                      <h3 className="text-sm font-bold text-white group-hover:text-[#f5c518] transition truncate">
+                      <h3 className="font-display text-sm font-bold text-white group-hover:text-[#f5c518] transition truncate">
                         {o.name}
                       </h3>
                       <div className="text-[11px] text-zinc-500 mt-0.5 truncate">
@@ -846,7 +825,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                         src={o.thumbnailUrl}
                         alt={o.name}
                         referrerPolicy="no-referrer"
-                        className="w-12 h-12 rounded-xl object-cover border border-[#262a36] shrink-0"
+                        className="w-12 h-12 rounded-xl object-cover border border-white/10 shrink-0"
                       />
                     )}
                   </div>
@@ -857,7 +836,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 </div>
 
                 <div
-                  className="pt-3 border-t border-[#1f232d] flex items-center justify-between text-xs text-zinc-400"
+                  className="pt-3 border-t border-white/[0.07] flex items-center justify-between text-xs text-zinc-400"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span className="text-[11px] text-zinc-500 tabular-nums">
@@ -868,7 +847,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                       type="button"
                       title="Edit Outfit Profile"
                       onClick={() => handleOpenEditOutfit(o)}
-                      className="p-1.5 rounded-lg hover:bg-[#202430] hover:text-white transition"
+                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:text-white transition cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -885,7 +864,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                         });
                         reloadAll();
                       }}
-                      className="p-1.5 rounded-lg hover:bg-[#202430] hover:text-white transition"
+                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:text-white transition cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" />
                     </button>
@@ -894,7 +873,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                         type="button"
                         title="Delete Outfit Profile"
                         onClick={(e) => handleDeleteOutfit(o.id, e)}
-                        className="p-1.5 rounded-lg hover:bg-red-950/60 hover:text-red-400 transition"
+                        className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-red-950/60 hover:text-red-400 transition cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -913,12 +892,12 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
           {backgrounds.map((b) => (
             <div
               key={b.id}
-              className="rounded-2xl p-5 bg-[#11131a] border border-[#262a36] hover:border-[#3a4052] transition flex flex-col justify-between space-y-4"
+              className="studio-card rounded-2xl p-5 hover:border-white/20 transition-colors flex flex-col justify-between space-y-4"
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-bold text-white">{b.name}</h3>
+                    <h3 className="font-display text-sm font-bold text-white">{b.name}</h3>
                     <div className="text-[11px] text-zinc-500 mt-0.5">
                       {(b.tags || []).join(' · ') || 'Background · Environment · Lighting'}
                     </div>
@@ -928,7 +907,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                       src={b.thumbnailUrl}
                       alt={b.name}
                       referrerPolicy="no-referrer"
-                      className="w-14 h-14 rounded-xl object-cover border border-[#262a36] shrink-0"
+                      className="w-14 h-14 rounded-xl object-cover border border-white/10 shrink-0"
                     />
                   )}
                 </div>
@@ -949,7 +928,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#1f232d] flex items-center justify-between text-xs text-zinc-400">
+              <div className="pt-3 border-t border-white/[0.07] flex items-center justify-between text-xs text-zinc-400">
                 <span className="text-[11px] text-zinc-500 tabular-nums">
                   Updated {new Date(b.updatedAt).toLocaleDateString()}
                 </span>
@@ -957,7 +936,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   <button
                     type="button"
                     onClick={() => handleOpenEditBg(b)}
-                    className="p-1.5 rounded-lg hover:bg-[#202430] hover:text-white transition"
+                    className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:text-white transition cursor-pointer"
                     title="Edit Background Profile"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -975,14 +954,14 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                       });
                       reloadAll();
                     }}
-                    className="p-1.5 rounded-lg hover:bg-[#202430] hover:text-white transition"
+                    className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] hover:text-white transition cursor-pointer"
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </button>
                   <button
                     type="button"
                     onClick={(e) => handleDeleteBg(b.id, e)}
-                    className="p-1.5 rounded-lg hover:bg-red-950/60 hover:text-red-400 transition"
+                    className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-red-950/60 hover:text-red-400 transition cursor-pointer"
                     title="Delete Background Profile"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -997,14 +976,14 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
       {/* SECTION D: COMPONENT LIBRARY */}
       {activeSection === 'components' && (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
             <button
               type="button"
               onClick={() => setComponentFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap shrink-0 cursor-pointer ${
                 componentFilter === 'all'
                   ? 'bg-[#f5c518] text-black font-bold'
-                  : 'bg-[#161922] text-zinc-400 hover:text-white border border-[#262a36]'
+                  : 'bg-[#121620] text-zinc-400 hover:text-white border border-white/[0.08]'
               }`}
             >
               All Components
@@ -1014,10 +993,10 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 key={key}
                 type="button"
                 onClick={() => setComponentFilter(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap shrink-0 cursor-pointer ${
                   componentFilter === key
                     ? 'bg-[#f5c518] text-black font-bold'
-                    : 'bg-[#161922] text-zinc-400 hover:text-white border border-[#262a36]'
+                    : 'bg-[#121620] text-zinc-400 hover:text-white border border-white/[0.08]'
                 }`}
               >
                 {COMPONENT_LABELS[key]}
@@ -1029,11 +1008,11 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             {filteredComponents.map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl p-4 bg-[#11131a] border border-[#262a36] flex flex-col justify-between space-y-3"
+                className="studio-card rounded-2xl p-4 flex flex-col justify-between space-y-3"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold text-white">{item.name}</span>
+                    <span className="font-display text-sm font-bold text-white">{item.name}</span>
                     <span className="text-[11px] text-[#f5c518] font-medium">
                       {COMPONENT_LABELS[item.componentKey as ComponentKey] ||
                         CAMERA_COMPONENT_LABELS[item.componentKey as CameraComponentKey]?.label ||
@@ -1043,7 +1022,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   <p className="text-xs text-zinc-300 leading-relaxed mt-2">{item.description}</p>
                 </div>
 
-                <div className="pt-2.5 border-t border-[#1f232d] flex items-center justify-between text-[11px] text-zinc-500">
+                <div className="pt-2.5 border-t border-white/[0.07] flex items-center justify-between text-[11px] text-zinc-500">
                   <span className="tabular-nums">
                     Saved {new Date(item.updatedAt).toLocaleDateString()}
                   </span>
@@ -1051,14 +1030,14 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => handleOpenEditComp(item)}
-                      className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-[#202430]"
+                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteComp(item.id)}
-                      className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-950/50"
+                      className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-950/50 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1070,554 +1049,501 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
         </div>
       )}
 
-      {/* MODAL 1: SUBJECT PROFILE (Up to 5 reference images) */}
-      {isSubjectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl bg-[#11131a] border border-[#262a36] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#1f232d] pb-3">
-              <div>
-                <h3 className="text-base font-bold text-white">
-                  {editingSubject ? 'Edit Subject Profile' : 'Create Subject Profile'}
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Upload up to 5 reference images of the same subject to extract a consolidated visual identity.
-                </p>
+      {/* MODAL 1: SUBJECT PROFILE */}
+      <BottomSheet
+        isOpen={isSubjectModalOpen}
+        onClose={() => setIsSubjectModalOpen(false)}
+        title={editingSubject ? 'Edit Subject Profile' : 'Create Subject Profile'}
+        subtitle="Upload up to 5 reference images of the same subject to extract a consolidated visual identity."
+        maxWidthClass="max-w-2xl"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsSubjectModalOpen(false)}
+              className="min-h-[40px] px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveSubject}
+              className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl cursor-pointer"
+            >
+              Save Subject Profile
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-[#121620] border border-white/[0.08] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white">
+                Subject Reference Images ({subjectImages.length}/5)
+              </span>
+              <input
+                type="file"
+                ref={subjectFileInputRef}
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleSubjectImageSelect}
+              />
+              {subjectImages.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => subjectFileInputRef.current?.click()}
+                  className="min-h-[34px] text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Photos (Max 5)</span>
+                </button>
+              )}
+            </div>
+
+            {subjectImages.length > 0 && (
+              <div className="grid grid-cols-5 gap-2">
+                {subjectImages.map((img) => (
+                  <div
+                    key={img.id}
+                    className="relative aspect-square rounded-lg overflow-hidden bg-black border border-white/10"
+                  >
+                    <img
+                      src={img.previewUrl}
+                      alt="Subject ref"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSubjectImages((prev) => prev.filter((i) => i.id !== img.id))
+                      }
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/80 text-white text-xs flex items-center justify-center cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
+            )}
+
+            {subjectImages.length > 0 && (
               <button
                 type="button"
-                onClick={() => setIsSubjectModalOpen(false)}
-                className="p-1 text-zinc-400 hover:text-white"
+                disabled={isAnalyzingSubject}
+                onClick={handleAnalyzeSubjectImages}
+                className="w-full min-h-[40px] py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                {isAnalyzingSubject ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Consolidating Subject Identity Across {subjectImages.length} Image(s)...</span>
+                  </>
+                ) : (
+                  <span>Analyze &amp; Consolidate Subject Description</span>
+                )}
+              </button>
+            )}
+
+            {subjectAnalysisError && (
+              <p className="text-xs text-red-400">{subjectAnalysisError}</p>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                  Subject Profile Name *
+                </label>
+                <input
+                  type="text"
+                  value={subjectName}
+                  onChange={(e) => setSubjectName(e.target.value)}
+                  placeholder="e.g. Studio Identity A"
+                  className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                  Keywords (comma separated)
+                </label>
+                <input
+                  type="text"
+                  value={subjectTags}
+                  onChange={(e) => setSubjectTags(e.target.value)}
+                  placeholder="e.g. Portrait, Realistic"
+                  className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-white mb-1">
+                Consolidated Subject Identity Description *
+              </label>
+              <textarea
+                value={subjectText}
+                onChange={(e) => setSubjectText(e.target.value)}
+                rows={4}
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                placeholder="Apparent age range, skin tone, facial structure, eyes, eyebrows, nose, lips, hair texture, and distinguishing marks..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-white mb-1">
+                Body Proportions &amp; Build Description (Independent)
+              </label>
+              <textarea
+                value={bodyText}
+                onChange={(e) => setBodyText(e.target.value)}
+                rows={3}
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                placeholder="Body proportions, silhouette, build, and anatomical geometry..."
+              />
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
+
+      {/* MODAL 2: OUTFIT PROFILE */}
+      <BottomSheet
+        isOpen={isOutfitModalOpen}
+        onClose={() => setIsOutfitModalOpen(false)}
+        title={editingOutfit ? 'Edit Outfit Profile' : 'Create Outfit Profile'}
+        subtitle="Upload an outfit reference image to extract clothing details or write your own reusable outfit specification."
+        maxWidthClass="max-w-2xl"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsOutfitModalOpen(false)}
+              className="min-h-[40px] px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveOutfit}
+              className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl cursor-pointer"
+            >
+              Save Outfit Profile
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-[#121620] border border-white/[0.08] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white">Outfit Reference Image</span>
+              <input
+                type="file"
+                ref={outfitFileInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handleOutfitImageSelect}
+              />
+              <button
+                type="button"
+                onClick={() => outfitFileInputRef.current?.click()}
+                className="min-h-[34px] text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>{outfitImage ? 'Change Image' : 'Upload Outfit Image'}</span>
               </button>
             </div>
 
-            {/* Multi-Image Reference Uploader (Up to 5 images) */}
-            <div className="p-4 rounded-xl bg-[#161922] border border-[#262a36] space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">
-                  Subject Reference Images ({subjectImages.length}/5)
-                </span>
-                <input
-                  type="file"
-                  ref={subjectFileInputRef}
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleSubjectImageSelect}
+            {outfitImage && (
+              <div className="flex items-center gap-3">
+                <img
+                  src={outfitImage.previewUrl}
+                  alt="Outfit ref"
+                  className="w-16 h-16 rounded-lg object-cover border border-white/10"
                 />
-                {subjectImages.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={() => subjectFileInputRef.current?.click()}
-                    className="text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload Photos (Max 5)</span>
-                  </button>
-                )}
-              </div>
-
-              {subjectImages.length > 0 && (
-                <div className="grid grid-cols-5 gap-2">
-                  {subjectImages.map((img) => (
-                    <div
-                      key={img.id}
-                      className="relative aspect-square rounded-lg overflow-hidden bg-black border border-[#2e3446]"
-                    >
-                      <img
-                        src={img.previewUrl}
-                        alt="Subject ref"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSubjectImages((prev) => prev.filter((i) => i.id !== img.id))
-                        }
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/80 text-white text-xs flex items-center justify-center"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {subjectImages.length > 0 && (
                 <button
                   type="button"
-                  disabled={isAnalyzingSubject}
-                  onClick={handleAnalyzeSubjectImages}
-                  className="w-full py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50"
+                  disabled={isAnalyzingOutfit}
+                  onClick={handleAnalyzeOutfitImage}
+                  className="flex-1 min-h-[40px] py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
                 >
-                  {isAnalyzingSubject ? (
+                  {isAnalyzingOutfit ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Consolidating Subject Identity Across {subjectImages.length} Image(s)...</span>
+                      <span>Analyzing Visible Garments &amp; Fabrics...</span>
                     </>
                   ) : (
-                    <span>Analyze & Consolidate Subject Description</span>
+                    <span>Analyze Outfit Reference</span>
                   )}
                 </button>
-              )}
+              </div>
+            )}
+            {outfitAnalysisError && (
+              <p className="text-xs text-red-400">{outfitAnalysisError}</p>
+            )}
+          </div>
 
-              {subjectAnalysisError && (
-                <p className="text-xs text-red-400">{subjectAnalysisError}</p>
-              )}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                Outfit Name *
+              </label>
+              <input
+                type="text"
+                value={outfitName}
+                onChange={(e) => setOutfitName(e.target.value)}
+                placeholder="e.g. Tailored Linen Blazer & Silk Camisole"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+              />
             </div>
 
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                    Subject Profile Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={subjectName}
-                    onChange={(e) => setSubjectName(e.target.value)}
-                    placeholder="e.g. Studio Identity A"
-                    className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white px-3.5 py-2 rounded-xl text-xs outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                    Keywords (comma separated)
-                  </label>
-                  <input
-                    type="text"
-                    value={subjectTags}
-                    onChange={(e) => setSubjectTags(e.target.value)}
-                    placeholder="e.g. Portrait, Realistic"
-                    className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white px-3.5 py-2 rounded-xl text-xs outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-white mb-1">
-                  Consolidated Subject Identity Description *
-                </label>
-                <textarea
-                  value={subjectText}
-                  onChange={(e) => setSubjectText(e.target.value)}
-                  rows={5}
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
-                  placeholder="Apparent age range, skin tone, facial structure, eyes, eyebrows, nose, lips, hair texture, and distinguishing marks..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-white mb-1">
-                  Body Proportions & Build Description (Independent)
-                </label>
-                <textarea
-                  value={bodyText}
-                  onChange={(e) => setBodyText(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
-                  placeholder="Body proportions, silhouette, build, and anatomical geometry..."
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={outfitGarment}
+                onChange={(e) => setOutfitGarment(e.target.value)}
+                placeholder="Garment categories"
+                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#f5c518]"
+              />
+              <input
+                type="text"
+                value={outfitColors}
+                onChange={(e) => setOutfitColors(e.target.value)}
+                placeholder="Colors & patterns"
+                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#f5c518]"
+              />
+              <input
+                type="text"
+                value={outfitMaterials}
+                onChange={(e) => setOutfitMaterials(e.target.value)}
+                placeholder="Fabrics & textures"
+                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#f5c518]"
+              />
+              <input
+                type="text"
+                value={outfitFit}
+                onChange={(e) => setOutfitFit(e.target.value)}
+                placeholder="Fit, drape & construction"
+                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#f5c518]"
+              />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1f232d]">
-              <button
-                type="button"
-                onClick={() => setIsSubjectModalOpen(false)}
-                className="px-4 py-2 text-xs text-zinc-400 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveSubject}
-                className="px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl"
-              >
-                Save Subject Profile
-              </button>
+            <div>
+              <label className="block text-xs font-bold text-white mb-1">
+                Complete Outfit Description (Source of Truth for Clothing Field) *
+              </label>
+              <textarea
+                value={outfitDesc}
+                onChange={(e) => setOutfitDesc(e.target.value)}
+                rows={4}
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                placeholder="Detailed description of visible garments, colors, fabrics, fit, neckline, sleeves, hems, accessories, and footwear..."
+              />
             </div>
           </div>
         </div>
-      )}
+      </BottomSheet>
 
-      {/* MODAL 2: OUTFIT PROFILE (With Image Analyzer) */}
-      {isOutfitModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl bg-[#11131a] border border-[#262a36] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#1f232d] pb-3">
-              <div>
-                <h3 className="text-base font-bold text-white">
-                  {editingOutfit ? 'Edit Outfit Profile' : 'Create Outfit Profile'}
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Upload an outfit reference image to extract clothing details or write your own reusable outfit specification.
-                </p>
-              </div>
+      {/* MODAL 3: BACKGROUND PROFILE */}
+      <BottomSheet
+        isOpen={isBgModalOpen}
+        onClose={() => setIsBgModalOpen(false)}
+        title={editingBg ? 'Edit Background Profile' : 'Create Background Profile'}
+        subtitle="Upload a scene reference image to extract independent Background, Environment, and Lighting descriptions."
+        maxWidthClass="max-w-2xl"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsBgModalOpen(false)}
+              className="min-h-[40px] px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveBg}
+              className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl cursor-pointer"
+            >
+              Save Background Profile
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-[#121620] border border-white/[0.08] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white">Background Reference Image</span>
+              <input
+                type="file"
+                ref={bgFileInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handleBgImageSelect}
+              />
               <button
                 type="button"
-                onClick={() => setIsOutfitModalOpen(false)}
-                className="p-1 text-zinc-400 hover:text-white"
+                onClick={() => bgFileInputRef.current?.click()}
+                className="min-h-[34px] text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <Upload className="w-3.5 h-3.5" />
+                <span>{bgImage ? 'Change Image' : 'Upload Scene Image'}</span>
               </button>
             </div>
 
-            {/* Outfit Reference Image Analyzer */}
-            <div className="p-4 rounded-xl bg-[#161922] border border-[#262a36] space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">Outfit Reference Image</span>
-                <input
-                  type="file"
-                  ref={outfitFileInputRef}
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleOutfitImageSelect}
+            {bgImage && (
+              <div className="flex items-center gap-3">
+                <img
+                  src={bgImage.previewUrl}
+                  alt="Background ref"
+                  className="w-16 h-16 rounded-lg object-cover border border-white/10"
                 />
                 <button
                   type="button"
-                  onClick={() => outfitFileInputRef.current?.click()}
-                  className="text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1"
+                  disabled={isAnalyzingBg}
+                  onClick={handleAnalyzeBgImage}
+                  className="flex-1 min-h-[40px] py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{outfitImage ? 'Change Image' : 'Upload Outfit Image'}</span>
+                  {isAnalyzingBg ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Extracting Background, Environment &amp; Lighting...</span>
+                    </>
+                  ) : (
+                    <span>Analyze Scene Reference</span>
+                  )}
                 </button>
               </div>
+            )}
+            {bgAnalysisError && <p className="text-xs text-red-400">{bgAnalysisError}</p>}
+          </div>
 
-              {outfitImage && (
-                <div className="flex items-center gap-3">
-                  <img
-                    src={outfitImage.previewUrl}
-                    alt="Outfit ref"
-                    className="w-16 h-16 rounded-lg object-cover border border-[#2e3446]"
-                  />
-                  <button
-                    type="button"
-                    disabled={isAnalyzingOutfit}
-                    onClick={handleAnalyzeOutfitImage}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50"
-                  >
-                    {isAnalyzingOutfit ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Analyzing Visible Garments & Fabrics...</span>
-                      </>
-                    ) : (
-                      <span>Analyze Outfit Reference</span>
-                    )}
-                  </button>
-                </div>
-              )}
-              {outfitAnalysisError && (
-                <p className="text-xs text-red-400">{outfitAnalysisError}</p>
-              )}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                Background Profile Name *
+              </label>
+              <input
+                type="text"
+                value={bgName}
+                onChange={(e) => setBgName(e.target.value)}
+                placeholder="e.g. Sunlit Concrete Studio Loft"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+              />
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Outfit Name *
-                </label>
-                <input
-                  type="text"
-                  value={outfitName}
-                  onChange={(e) => setOutfitName(e.target.value)}
-                  placeholder="e.g. Tailored Linen Blazer & Silk Camisole"
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white px-3.5 py-2 rounded-xl text-xs outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  value={outfitGarment}
-                  onChange={(e) => setOutfitGarment(e.target.value)}
-                  placeholder="Garment categories"
-                  className="bg-[#181b24] border border-[#262a36] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#f5c518]"
-                />
-                <input
-                  type="text"
-                  value={outfitColors}
-                  onChange={(e) => setOutfitColors(e.target.value)}
-                  placeholder="Colors & patterns"
-                  className="bg-[#181b24] border border-[#262a36] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#f5c518]"
-                />
-                <input
-                  type="text"
-                  value={outfitMaterials}
-                  onChange={(e) => setOutfitMaterials(e.target.value)}
-                  placeholder="Fabrics & textures"
-                  className="bg-[#181b24] border border-[#262a36] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#f5c518]"
-                />
-                <input
-                  type="text"
-                  value={outfitFit}
-                  onChange={(e) => setOutfitFit(e.target.value)}
-                  placeholder="Fit, drape & construction"
-                  className="bg-[#181b24] border border-[#262a36] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#f5c518]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-white mb-1">
-                  Complete Outfit Description (Source of Truth for Clothing Field) *
-                </label>
-                <textarea
-                  value={outfitDesc}
-                  onChange={(e) => setOutfitDesc(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
-                  placeholder="Detailed description of visible garments, colors, fabrics, fit, neckline, sleeves, hems, accessories, and footwear..."
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-white mb-1">
+                1. Background Description (Objects, Surfaces, Textures, Depth)
+              </label>
+              <textarea
+                value={bgDesc}
+                onChange={(e) => setBgDesc(e.target.value)}
+                rows={3}
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                placeholder="Describe visible background structures, surfaces, colors, textures, and depth..."
+              />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1f232d]">
-              <button
-                type="button"
-                onClick={() => setIsOutfitModalOpen(false)}
-                className="px-4 py-2 text-xs text-zinc-400 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveOutfit}
-                className="px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl"
-              >
-                Save Outfit Profile
-              </button>
+            <div>
+              <label className="block text-xs font-bold text-white mb-1">
+                2. Environment &amp; Setting Context
+              </label>
+              <textarea
+                value={bgEnvironment}
+                onChange={(e) => setBgEnvironment(e.target.value)}
+                rows={3}
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                placeholder="Describe indoor/outdoor setting, architectural context, atmosphere, or weather conditions..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-white mb-1">
+                3. Lighting Characteristics
+              </label>
+              <textarea
+                value={bgLighting}
+                onChange={(e) => setBgLighting(e.target.value)}
+                rows={3}
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                placeholder="Describe apparent light sources, direction, softness, color temperature, highlights, and shadows..."
+              />
             </div>
           </div>
         </div>
-      )}
-
-      {/* MODAL 3: BACKGROUND PROFILE (With Image Analyzer for Background, Environment, Lighting) */}
-      {isBgModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl bg-[#11131a] border border-[#262a36] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#1f232d] pb-3">
-              <div>
-                <h3 className="text-base font-bold text-white">
-                  {editingBg ? 'Edit Background Profile' : 'Create Background Profile'}
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Upload a scene reference image to extract independent Background, Environment, and Lighting descriptions.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsBgModalOpen(false)}
-                className="p-1 text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Background Image Analyzer */}
-            <div className="p-4 rounded-xl bg-[#161922] border border-[#262a36] space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white">Background Reference Image</span>
-                <input
-                  type="file"
-                  ref={bgFileInputRef}
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleBgImageSelect}
-                />
-                <button
-                  type="button"
-                  onClick={() => bgFileInputRef.current?.click()}
-                  className="text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{bgImage ? 'Change Image' : 'Upload Scene Image'}</span>
-                </button>
-              </div>
-
-              {bgImage && (
-                <div className="flex items-center gap-3">
-                  <img
-                    src={bgImage.previewUrl}
-                    alt="Background ref"
-                    className="w-16 h-16 rounded-lg object-cover border border-[#2e3446]"
-                  />
-                  <button
-                    type="button"
-                    disabled={isAnalyzingBg}
-                    onClick={handleAnalyzeBgImage}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50"
-                  >
-                    {isAnalyzingBg ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Extracting Background, Environment & Lighting...</span>
-                      </>
-                    ) : (
-                      <span>Analyze Scene Reference</span>
-                    )}
-                  </button>
-                </div>
-              )}
-              {bgAnalysisError && <p className="text-xs text-red-400">{bgAnalysisError}</p>}
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Background Profile Name *
-                </label>
-                <input
-                  type="text"
-                  value={bgName}
-                  onChange={(e) => setBgName(e.target.value)}
-                  placeholder="e.g. Sunlit Concrete Studio Loft"
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white px-3.5 py-2 rounded-xl text-xs outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-white mb-1">
-                  1. Background Description (Objects, Surfaces, Textures, Depth)
-                </label>
-                <textarea
-                  value={bgDesc}
-                  onChange={(e) => setBgDesc(e.target.value)}
-                  rows={3}
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
-                  placeholder="Describe visible background structures, surfaces, colors, textures, and depth..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-white mb-1">
-                  2. Environment & Setting Context
-                </label>
-                <textarea
-                  value={bgEnvironment}
-                  onChange={(e) => setBgEnvironment(e.target.value)}
-                  rows={3}
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
-                  placeholder="Describe indoor/outdoor setting, architectural context, atmosphere, or weather conditions..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-white mb-1">
-                  3. Lighting Characteristics
-                </label>
-                <textarea
-                  value={bgLighting}
-                  onChange={(e) => setBgLighting(e.target.value)}
-                  rows={3}
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
-                  placeholder="Describe apparent light sources, direction, softness, color temperature, highlights, and shadows..."
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1f232d]">
-              <button
-                type="button"
-                onClick={() => setIsBgModalOpen(false)}
-                className="px-4 py-2 text-xs text-zinc-400 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveBg}
-                className="px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl"
-              >
-                Save Background Profile
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </BottomSheet>
 
       {/* MODAL 4: COMPONENT PRESET LIBRARY */}
-      {isCompModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-[#11131a] border border-[#262a36] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1f232d] pb-3">
-              <h3 className="text-base font-bold text-white">
-                {editingComp ? 'Edit Component Preset' : 'New Component Preset'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsCompModalOpen(false)}
-                className="p-1 text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <BottomSheet
+        isOpen={isCompModalOpen}
+        onClose={() => setIsCompModalOpen(false)}
+        title={editingComp ? 'Edit Component Preset' : 'New Component Preset'}
+        maxWidthClass="max-w-lg"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCompModalOpen(false)}
+              className="min-h-[40px] px-4 py-2 text-xs text-zinc-400 hover:text-white cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveComp}
+              className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl cursor-pointer"
+            >
+              Save Component Preset
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+              Component Category
+            </label>
+            <select
+              value={compKey}
+              onChange={(e) => setCompKey(e.target.value as ComponentKey)}
+              className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+            >
+              {ALL_COMPONENT_KEYS.map((k) => (
+                <option key={k} value={k} className="bg-[#0e1118] text-white">
+                  {COMPONENT_LABELS[k]}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Component Category
-                </label>
-                <select
-                  value={compKey}
-                  onChange={(e) => setCompKey(e.target.value as ComponentKey)}
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white px-3.5 py-2 rounded-xl text-xs outline-none"
-                >
-                  {ALL_COMPONENT_KEYS.map((k) => (
-                    <option key={k} value={k} className="bg-[#141722] text-white">
-                      {COMPONENT_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">
+              Preset Name *
+            </label>
+            <input
+              type="text"
+              value={compName}
+              onChange={(e) => setCompName(e.target.value)}
+              placeholder="e.g. Low-Angle Three-Quarter Perspective"
+              className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+            />
+          </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Preset Name *
-                </label>
-                <input
-                  type="text"
-                  value={compName}
-                  onChange={(e) => setCompName(e.target.value)}
-                  placeholder="e.g. Low-Angle Three-Quarter Perspective"
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white px-3.5 py-2 rounded-xl text-xs outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-white mb-1">
-                  Component Description *
-                </label>
-                <textarea
-                  value={compDesc}
-                  onChange={(e) => setCompDesc(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
-                  placeholder="Detailed description for this reusable component..."
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1f232d]">
-              <button
-                type="button"
-                onClick={() => setIsCompModalOpen(false)}
-                className="px-4 py-2 text-xs text-zinc-400 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveComp}
-                className="px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl"
-              >
-                Save Component Preset
-              </button>
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-white mb-1">
+              Component Description *
+            </label>
+            <textarea
+              value={compDesc}
+              onChange={(e) => setCompDesc(e.target.value)}
+              rows={4}
+              className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+              placeholder="Detailed description for this reusable component..."
+            />
           </div>
         </div>
-      )}
+      </BottomSheet>
     </div>
   );
 };

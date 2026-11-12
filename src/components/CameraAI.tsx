@@ -388,11 +388,11 @@ export const CameraAI: React.FC<CameraAIProps> = ({
       />
 
       {/* HEADER BAR */}
-      <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-3">
+      <div className="studio-panel rounded-2xl p-4 sm:p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
           <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-[#f5c518]/20 border border-[#f5c518]/40 flex items-center justify-center text-[#f5c518]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#f5c518]/15 border border-[#f5c518]/35 flex items-center justify-center text-[#f5c518] shrink-0">
                 <Camera className="w-4 h-4" />
               </div>
               <h2 className="font-display text-base sm:text-lg font-bold text-white">
@@ -409,14 +409,14 @@ export const CameraAI: React.FC<CameraAIProps> = ({
               type="button"
               disabled={isScanningTemplate || isScanningBase}
               onClick={handleScanBoth}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#ffe169] via-[#f5c518] to-[#d49a00] text-black font-black text-xs uppercase tracking-wider shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="min-h-[42px] px-4 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
             >
               {isScanningTemplate || isScanningBase ? (
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-black" />
               ) : (
-                <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.2]" />
               )}
-              <span>Scan both images (Parallel)</span>
+              <span>Scan Both Images</span>
             </button>
           )}
         </div>
@@ -424,16 +424,13 @@ export const CameraAI: React.FC<CameraAIProps> = ({
         {/* SECTION 1: TWO UPLOAD SLOTS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* SLOT 1: CAMERA TEMPLATE (REQUIRED) */}
-          <div className="p-4 rounded-xl glass-card border border-white/15 flex flex-col justify-between gap-3">
+          <div className="p-4 rounded-xl studio-card flex flex-col justify-between gap-3">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#f5c518]" />
-                  <span>1. Camera Template (Required)</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-display text-xs sm:text-sm font-bold text-white">
+                  1. Camera Template
                 </span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
-                  REQUIRED
-                </span>
+                <span className="text-[11px] font-mono text-amber-300">Required · Optics</span>
               </div>
               <p className="text-xs text-zinc-400">
                 Uploaded purely for its camera geometry, pitch, and optics. Subject content is ignored.
@@ -499,16 +496,13 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           </div>
 
           {/* SLOT 2: BASE IMAGE ("YOUR IMAGE", OPTIONAL) */}
-          <div className="p-4 rounded-xl glass-card border border-white/15 flex flex-col justify-between gap-3">
+          <div className="p-4 rounded-xl studio-card flex flex-col justify-between gap-3">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>2. Your Image (Optional Base)</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-display text-xs sm:text-sm font-bold text-white">
+                  2. Your Image
                 </span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  OPTIONAL
-                </span>
+                <span className="text-[11px] font-mono text-zinc-400">Optional · Base Scene</span>
               </div>
               <p className="text-xs text-zinc-400">
                 The subject, pose, clothing, and environment to re-photograph from the new angle.
@@ -527,7 +521,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                       setBaseImage(null);
                       setBaseAnalysis(null);
                     }}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/80 text-white hover:bg-red-600 flex items-center justify-center text-xs cursor-pointer"
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/80 text-white hover:bg-red-600 flex items-center justify-center text-xs cursor-pointer"
                   >
                     ×
                   </button>
@@ -550,7 +544,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 <button
                   type="button"
                   onClick={() => baseInputRef.current?.click()}
-                  className="flex-1 py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 text-xs font-bold border border-white/10 transition cursor-pointer"
+                  className="flex-1 min-h-[40px] py-2 px-3 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 text-xs font-bold border border-white/10 transition cursor-pointer"
                 >
                   {baseImage ? 'Replace Base' : 'Select Base'}
                 </button>
@@ -558,7 +552,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                   type="button"
                   disabled={!baseImage || isScanningBase}
                   onClick={handleScanBase}
-                  className="flex-1 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 min-h-[40px] py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {isScanningBase ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -577,7 +571,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
 
       {/* SECTION 2: EDITABLE CAMERA PARAMETERS & SCHEMATIC */}
       {templateAnalysis && (
-        <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
+        <div className="studio-panel rounded-2xl p-4 sm:p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
             <div>
               <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
@@ -589,14 +583,15 @@ export const CameraAI: React.FC<CameraAIProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
-                Confidence: {Math.round(templateAnalysis.estimates.pitch_confidence * 100)}%
+            <div className="flex items-center gap-3 text-xs">
+              <span className="font-mono font-semibold text-emerald-300 tabular-nums">
+                Confidence {Math.round(templateAnalysis.estimates.pitch_confidence * 100)}%
               </span>
+              <span className="text-zinc-600" aria-hidden="true">·</span>
               <button
                 type="button"
                 onClick={() => setShowEvidencePanel((prev) => !prev)}
-                className="text-xs text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                className="text-xs text-zinc-300 hover:text-white flex items-center gap-1 cursor-pointer"
               >
                 <span>{showEvidencePanel ? 'Hide Evidence' : 'Show Evidence'}</span>
                 {showEvidencePanel ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -858,7 +853,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
 
       {/* SECTION 3: PROMPT OUTPUT, VARIANT SWITCHER, COPY & SAVE */}
       {templateAnalysis && (
-        <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
+        <div className="studio-panel rounded-2xl p-4 sm:p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
             <div>
               <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
@@ -884,7 +879,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                     key={v.id}
                     type="button"
                     onClick={() => setActiveVariant(v.id)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
                       activeVariant === v.id
                         ? 'bg-[#f5c518] text-black font-bold'
                         : 'text-zinc-400 hover:text-white'
@@ -898,7 +893,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
               <select
                 value={targetModel}
                 onChange={(e) => setTargetModel(e.target.value as TargetModelType)}
-                className="bg-black/60 text-white border border-white/15 rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
+                className="min-h-[38px] bg-black/60 text-white border border-white/15 rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
               >
                 <option value="universal" className="bg-[#0e111a]">Universal / Standard</option>
                 <option value="gemini" className="bg-[#0e111a]">Google Gemini</option>
@@ -913,7 +908,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             readOnly
             value={finalPrompt}
             rows={16}
-            className="w-full glass-panel text-white p-4 rounded-2xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-[#f5c518] selection:text-black shadow-inner resize-y min-h-[260px]"
+            className="w-full bg-[#090b10] border border-white/10 text-white p-4 rounded-xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-[#f5c518] selection:text-black resize-y min-h-[260px]"
           />
 
           {/* Bottom Action Bar */}
@@ -924,22 +919,22 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 value={projectTitle}
                 onChange={(e) => setProjectTitle(e.target.value)}
                 placeholder="Project title..."
-                className="bg-black/40 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-2 text-xs text-white outline-none flex-1 sm:w-48"
+                className="min-h-[42px] bg-black/40 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-2 text-xs text-white outline-none flex-1 sm:w-48"
               />
               <button
                 type="button"
                 onClick={handleSaveAsProject}
-                className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold text-xs border border-white/15 flex items-center gap-1.5 transition cursor-pointer shrink-0"
+                className="min-h-[42px] px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold text-xs border border-white/15 flex items-center gap-1.5 transition cursor-pointer shrink-0"
               >
                 <BookmarkPlus className="w-3.5 h-3.5 text-[#f5c518]" />
-                <span>Save as project</span>
+                <span>Save Project</span>
               </button>
             </div>
 
             <button
               type="button"
               onClick={handleCopyPrompt}
-              className="w-full sm:w-auto min-w-[200px] py-3 px-6 rounded-xl bg-gradient-to-r from-[#ffe169] via-[#f5c518] to-[#d49a00] hover:brightness-105 text-black font-black text-xs uppercase tracking-wider shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto min-w-[200px] min-h-[44px] py-3 px-6 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
             >
               {copySuccess ? (
                 <>

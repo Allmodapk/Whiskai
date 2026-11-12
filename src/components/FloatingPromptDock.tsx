@@ -195,9 +195,9 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
         {/* Main Compact Floating Compilation Bar */}
         <motion.div
           layout
-          className={`glass-dock rounded-2xl px-3.5 py-2.5 sm:px-5 sm:py-3 flex flex-wrap items-center justify-between gap-3 transition-colors ${
+          className={`studio-dock rounded-2xl px-3.5 py-2.5 sm:px-5 sm:py-3 flex flex-wrap items-center justify-between gap-2.5 transition-colors ${
             hasUnbuiltChanges
-              ? 'border-amber-400/50 shadow-[0_12px_40px_-8px_rgba(245,197,24,0.25)]'
+              ? 'border-amber-400/55 shadow-[0_12px_40px_-8px_rgba(245,197,24,0.25)]'
               : 'border-white/15'
           }`}
         >
@@ -246,15 +246,15 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
               <div className="text-[11px] truncate">
                 {hasUnbuiltChanges ? (
                   <span className="text-amber-300 font-medium">
-                    Unbuilt edits detected — click Rebuild Prompt to sync output
+                    Unbuilt edits detected — click Rebuild Prompt to sync
                   </span>
                 ) : generatedPrompt ? (
                   <span className="text-emerald-300/90 font-mono tabular-nums">
-                    Compiled & synced ({charCount.toLocaleString()} chars)
+                    Compiled &amp; ready ({charCount.toLocaleString()} chars)
                   </span>
                 ) : (
                   <span className="text-zinc-400">
-                    Review accordion fields above, then compile your prompt
+                    Review fields above, then compile your prompt
                   </span>
                 )}
               </div>
@@ -267,7 +267,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
               <button
                 type="button"
                 onClick={() => setIsDrawerOpen((o) => !o)}
-                className="min-h-[36px] px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0"
+                className="min-h-[42px] sm:min-h-[36px] px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0"
               >
                 {isDrawerOpen ? (
                   <>
@@ -286,9 +286,9 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
             <button
               type="button"
               onClick={onGeneratePrompt}
-              className={`min-h-[36px] px-4 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`min-h-[42px] sm:min-h-[36px] px-4 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 ${
                 !generatedPrompt || hasUnbuiltChanges
-                  ? 'bg-gradient-to-r from-[#ffe169] via-[#f5c518] to-[#d49a00] text-black shadow-md shadow-amber-500/20 hover:brightness-105'
+                  ? 'bg-[#f5c518] hover:bg-[#ffe169] text-black shadow-md shadow-amber-500/20'
                   : 'bg-white/[0.08] hover:bg-white/[0.14] text-white border border-white/10'
               }`}
             >
@@ -305,7 +305,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Compile Final Prompt</span>
+                  <span>Compile Prompt</span>
                 </>
               )}
             </button>
@@ -314,7 +314,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
               <button
                 type="button"
                 onClick={onCopyPrompt}
-                className="min-h-[36px] px-4 py-1.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 shadow-sm"
+                className="min-h-[42px] sm:min-h-[36px] px-4 py-1.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 shadow-sm"
               >
                 {copyFeedback ? (
                   <>

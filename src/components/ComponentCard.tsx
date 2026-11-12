@@ -153,13 +153,13 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-      className={`rounded-2xl transition-all duration-150 overflow-hidden ${
+      transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+      className={`rounded-2xl transition-colors duration-150 overflow-hidden ${
         state === 'ignored' || state === 'unavailable'
-          ? 'bg-black/35 border border-white/[0.04] opacity-65'
+          ? 'bg-[#0a0c12] border border-white/[0.05] opacity-70'
           : state === 'edited'
-          ? 'glass-card border-sky-400/40 shadow-[0_8px_28px_-12px_rgba(56,189,248,0.2)]'
-          : 'glass-card hover:border-white/20'
+          ? 'studio-card border-sky-400/45'
+          : 'studio-card hover:border-white/20'
       }`}
     >
       {/* Header Row */}
@@ -178,7 +178,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
             <span
               className={`text-[11px] font-medium ${
                 component.needsSoloRewrite
-                  ? 'text-amber-400 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30'
+                  ? 'text-amber-300 font-semibold'
                   : state === 'unavailable' || isUnavailable
                   ? 'text-amber-400/90'
                   : state === 'ignored' || isEmpty
@@ -201,7 +201,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
 
         {/* Interactive State Controls */}
         <div
-          className="flex items-center gap-1 shrink-0"
+          className="flex items-center gap-1.5 shrink-0"
           onClick={(e) => e.stopPropagation()}
         >
           {hasSavedOptions && (
@@ -212,10 +212,10 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                 setIsPickerOpen(!isPickerOpen);
                 setIsExpanded(true);
               }}
-              className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition whitespace-nowrap shrink-0 ${
+              className={`min-h-[40px] sm:min-h-[34px] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 ${
                 component.selectedProfileName || isPickerOpen
-                  ? 'bg-[#f5c518]/15 text-[#f5c518] border border-[#f5c518]/40'
-                  : 'bg-[#181b24] text-zinc-300 hover:text-white border border-[#262a36]'
+                  ? 'bg-[#f5c518]/15 text-[#f5c518] border border-[#f5c518]/45'
+                  : 'bg-[#171b26] text-zinc-300 hover:text-white border border-white/[0.08]'
               }`}
             >
               <FolderOpen className="w-3.5 h-3.5" />
@@ -227,10 +227,10 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
             type="button"
             title="Lock / Include this component in the final prompt"
             onClick={() => onUpdateState('locked')}
-            className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition whitespace-nowrap shrink-0 ${
+            className={`min-h-[40px] sm:min-h-[34px] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0 ${
               state === 'locked' && !isUnavailable
                 ? 'bg-[#f5c518] text-black font-bold'
-                : 'bg-[#181b24] text-zinc-400 hover:text-white border border-[#262a36]'
+                : 'bg-[#171b26] text-zinc-400 hover:text-white border border-white/[0.08]'
             }`}
           >
             <Lock className="w-3 h-3" />
@@ -244,10 +244,10 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
               setIsEditing(true);
               setIsExpanded(true);
             }}
-            className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition whitespace-nowrap shrink-0 ${
+            className={`min-h-[40px] sm:min-h-[34px] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0 ${
               state === 'edited'
-                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
-                : 'bg-[#181b24] text-zinc-400 hover:text-white border border-[#262a36]'
+                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/45'
+                : 'bg-[#171b26] text-zinc-400 hover:text-white border border-white/[0.08]'
             }`}
           >
             <Edit3 className="w-3 h-3" />
@@ -258,10 +258,10 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
             type="button"
             title="Ignore: Exclude this component from final prompt"
             onClick={() => onUpdateState(state === 'ignored' ? 'locked' : 'ignored')}
-            className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition whitespace-nowrap shrink-0 ${
+            className={`min-h-[40px] sm:min-h-[34px] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0 ${
               state === 'ignored'
-                ? 'bg-red-500/20 text-red-300 border border-red-500/40'
-                : 'bg-[#181b24] text-zinc-400 hover:text-zinc-200 border border-[#262a36]'
+                ? 'bg-red-500/20 text-red-300 border border-red-500/45'
+                : 'bg-[#171b26] text-zinc-400 hover:text-zinc-200 border border-white/[0.08]'
             }`}
           >
             <Ban className="w-3 h-3" />
@@ -271,7 +271,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="min-h-[34px] min-w-[34px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-white transition"
+            className="min-h-[40px] min-w-[40px] sm:min-h-[34px] sm:min-w-[34px] flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.04] transition cursor-pointer"
             aria-label={isExpanded ? 'Collapse component' : 'Expand component'}
           >
             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}

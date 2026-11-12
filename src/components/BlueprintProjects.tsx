@@ -102,14 +102,14 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 glass-panel p-5 rounded-2xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 studio-panel p-5 rounded-2xl">
         <div>
           <div className="flex items-center gap-2">
             <FolderKanban className="w-5 h-5 text-[#f5c518]" />
             <h2 className="font-display text-base font-bold text-white tracking-tight">
-              Saved Projects & Blueprints
+              Saved Projects &amp; Blueprints
             </h2>
           </div>
           <p className="text-xs text-zinc-400 mt-0.5">
@@ -125,7 +125,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search projects..."
-              className="w-full bg-black/40 border border-white/15 focus:border-[#f5c518] text-white pl-8 pr-3 py-1.5 rounded-xl text-xs outline-none"
+              className="w-full min-h-[40px] bg-black/40 border border-white/15 focus:border-[#f5c518] text-white pl-8 pr-3 py-1.5 rounded-xl text-xs outline-none"
             />
           </div>
         )}
@@ -133,11 +133,11 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
 
       {/* Blueprint list */}
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/15 glass-panel p-12 text-center flex flex-col items-center justify-center">
+        <div className="rounded-2xl border border-dashed border-white/15 studio-panel p-12 text-center flex flex-col items-center justify-center">
           <Layers className="w-10 h-10 text-zinc-600 mb-3" />
           <h3 className="font-display text-sm font-bold text-zinc-300">No Saved Projects Found</h3>
           <p className="text-xs text-zinc-500 max-w-sm mt-1">
-            Analyze an image in Tools, customize your 13 components or camera perspective, and click "Save Project" to store it here.
+            Analyze an image in any tool workspace, customize your fields or camera framing, and save it here.
           </p>
         </div>
       ) : (
@@ -158,7 +158,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
               <div
                 key={b.id}
                 onClick={() => onLoadBlueprint(b)}
-                className="group rounded-2xl glass-card hover:border-[#f5c518]/40 p-5 transition-all cursor-pointer flex flex-col justify-between"
+                className="group rounded-2xl studio-card hover:border-[#f5c518]/45 p-5 transition-all cursor-pointer flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
@@ -247,7 +247,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
                       type="button"
                       title="Rename Project"
                       onClick={(e) => handleStartRename(b, e)}
-                      className="p-1.5 rounded-lg hover:bg-[#202430] text-zinc-400 hover:text-white transition"
+                      className="min-w-[34px] min-h-[34px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-zinc-400 hover:text-white transition cursor-pointer"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -256,7 +256,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
                       type="button"
                       title="Duplicate Project"
                       onClick={(e) => handleDuplicate(b, e)}
-                      className="p-1.5 rounded-lg hover:bg-[#202430] text-zinc-400 hover:text-white transition"
+                      className="min-w-[34px] min-h-[34px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-zinc-400 hover:text-white transition cursor-pointer"
                     >
                       <Files className="w-3.5 h-3.5" />
                     </button>
@@ -267,7 +267,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
                           type="button"
                           title="Copy Final Prompt"
                           onClick={(e) => handleCopyPrompt(b.id, b.finalPrompt, e)}
-                          className="p-1.5 rounded-lg hover:bg-[#202430] text-zinc-400 hover:text-white transition"
+                          className="min-w-[34px] min-h-[34px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-zinc-400 hover:text-white transition cursor-pointer"
                         >
                           {copiedId === b.id ? (
                             <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -280,7 +280,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
                           type="button"
                           title="Download Prompt (.txt)"
                           onClick={(e) => handleDownloadPrompt(b, e)}
-                          className="p-1.5 rounded-lg hover:bg-[#202430] text-zinc-400 hover:text-white transition"
+                          className="min-w-[34px] min-h-[34px] flex items-center justify-center rounded-lg hover:bg-white/[0.08] text-zinc-400 hover:text-white transition cursor-pointer"
                         >
                           <Download className="w-3.5 h-3.5" />
                         </button>
@@ -291,7 +291,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
                       type="button"
                       title="Delete Project"
                       onClick={(e) => handleDelete(b.id, e)}
-                      className="p-1.5 rounded-lg hover:bg-red-950/60 text-zinc-400 hover:text-red-400 transition"
+                      className="min-w-[34px] min-h-[34px] flex items-center justify-center rounded-lg hover:bg-red-950/60 text-zinc-400 hover:text-red-400 transition cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
