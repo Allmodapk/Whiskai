@@ -75,7 +75,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
             >
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#f5c518]" />
+                  <Sparkles className="w-4 h-4 text-cyan-300" />
                   <span className="font-display font-bold text-sm text-white">
                     Compiled Prompt Inspector
                   </span>
@@ -92,7 +92,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
                         type="checkbox"
                         checked={Boolean(showNegativePrompt)}
                         onChange={(e) => onToggleNegativePrompt(e.target.checked)}
-                        className="accent-[#f5c518]"
+                        className="accent-cyan-400"
                       />
                       <span>Negative Prompt</span>
                     </label>
@@ -103,7 +103,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
                     <select
                       value={targetModel}
                       onChange={(e) => onSetTargetModel(e.target.value as TargetModelType)}
-                      className="bg-white/[0.06] text-white border border-white/15 rounded-xl px-2.5 py-1 text-xs font-semibold outline-none focus:border-[#f5c518]"
+                      className="bg-white/[0.06] text-white border border-white/15 rounded-xl px-2.5 py-1 text-xs font-semibold outline-none focus:border-cyan-400"
                     >
                       <option value="universal" className="bg-[#0e111a]">
                         Universal Format
@@ -134,7 +134,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
                 readOnly
                 value={exportedPrompt}
                 rows={7}
-                className="w-full bg-[#06080d]/90 border border-white/10 text-zinc-100 p-3.5 rounded-xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-[#f5c518] selection:text-black resize-y max-h-[36vh]"
+                className="w-full bg-[#06080d]/90 border border-white/10 text-zinc-100 p-3.5 rounded-xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-cyan-400 selection:text-slate-950 resize-y max-h-[36vh]"
               />
 
               {showNegativePrompt && negativePrompt && onChangeNegativePrompt && (
@@ -155,7 +155,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
                 <button
                   type="button"
                   onClick={onCopyPrompt}
-                  className="py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  className="py-2.5 px-4 rounded-xl studio-cta-primary font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
                   {copyFeedback ? (
                     <>
@@ -184,7 +184,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
                   onClick={onSaveProject}
                   className="py-2.5 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 font-semibold text-xs border border-white/10 flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
-                  <BookmarkPlus className="w-4 h-4 text-[#f5c518]" />
+                  <BookmarkPlus className="w-4 h-4 text-cyan-300" />
                   <span>Save to Projects</span>
                 </button>
               </div>
@@ -197,7 +197,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
           layout
           className={`studio-dock rounded-2xl px-3.5 py-2.5 sm:px-5 sm:py-3 flex flex-wrap items-center justify-between gap-2.5 transition-colors ${
             hasUnbuiltChanges
-              ? 'border-amber-400/55 shadow-[0_12px_40px_-8px_rgba(245,197,24,0.25)]'
+              ? 'border-cyan-400/55 shadow-[0_12px_40px_-8px_rgba(34,211,238,0.22)]'
               : 'border-white/15'
           }`}
         >
@@ -206,10 +206,10 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
             <div
               className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
                 hasUnbuiltChanges
-                  ? 'bg-amber-500/20 border-amber-400/50 text-[#f5c518]'
+                  ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300'
                   : generatedPrompt
                   ? 'bg-emerald-500/15 border-emerald-400/40 text-emerald-300'
-                  : 'bg-white/[0.06] border-white/10 text-[#f5c518]'
+                  : 'bg-white/[0.06] border-white/10 text-cyan-300'
               }`}
             >
               {hasUnbuiltChanges ? (
@@ -237,7 +237,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
                   </>
                 )}
                 <span className="text-zinc-600 hidden md:inline">·</span>
-                <span className="font-mono text-[#f5c518] tabular-nums hidden md:inline whitespace-nowrap">
+                <span className="font-mono text-cyan-300 tabular-nums hidden md:inline whitespace-nowrap">
                   {outputRatio}
                 </span>
               </div>
@@ -271,12 +271,12 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
               >
                 {isDrawerOpen ? (
                   <>
-                    <ChevronDown className="w-3.5 h-3.5 text-[#f5c518]" />
+                    <ChevronDown className="w-3.5 h-3.5 text-cyan-300" />
                     <span className="hidden sm:inline">Hide Dock</span>
                   </>
                 ) : (
                   <>
-                    <ChevronUp className="w-3.5 h-3.5 text-[#f5c518]" />
+                    <ChevronUp className="w-3.5 h-3.5 text-cyan-300" />
                     <span className="hidden sm:inline">Inspect Prompt</span>
                   </>
                 )}
@@ -288,7 +288,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
               onClick={onGeneratePrompt}
               className={`min-h-[42px] sm:min-h-[36px] px-4 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 ${
                 !generatedPrompt || hasUnbuiltChanges
-                  ? 'bg-[#f5c518] hover:bg-[#ffe169] text-black shadow-md shadow-amber-500/20'
+                  ? 'studio-cta-primary'
                   : 'bg-white/[0.08] hover:bg-white/[0.14] text-white border border-white/10'
               }`}
             >
@@ -314,7 +314,7 @@ export const FloatingPromptDock: React.FC<FloatingPromptDockProps> = ({
               <button
                 type="button"
                 onClick={onCopyPrompt}
-                className="min-h-[42px] sm:min-h-[36px] px-4 py-1.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 shadow-sm"
+                className="min-h-[42px] sm:min-h-[36px] px-4 py-1.5 rounded-xl studio-cta-primary font-bold text-xs flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 shadow-sm"
               >
                 {copyFeedback ? (
                   <>

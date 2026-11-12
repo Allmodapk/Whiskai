@@ -141,7 +141,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[#1f232d] bg-[#141722]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#f5c518]/20 text-[#f5c518] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-cyan-400/20 text-cyan-300 flex items-center justify-center">
               <Shirt className="w-4 h-4" />
             </div>
             <div>
@@ -157,7 +157,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
               <button
                 type="button"
                 onClick={handleOpenCreate}
-                className="px-3 py-1.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition"
+                className="px-3 py-1.5 rounded-xl studio-cta-primary font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Outfit</span>
@@ -199,7 +199,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Minimalist Ivory Silk & Tailored Linen"
-                  className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-[#f5c518]"
+                  className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-cyan-400"
                 />
               </div>
 
@@ -213,7 +213,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     value={garmentType}
                     onChange={(e) => setGarmentType(e.target.value)}
                     placeholder="e.g. Sleeveless silk top and wide-leg trousers"
-                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -226,7 +226,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     value={colors}
                     onChange={(e) => setColors(e.target.value)}
                     placeholder="e.g. Ivory white, stone beige, muted neutral"
-                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -239,7 +239,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     value={materials}
                     onChange={(e) => setMaterials(e.target.value)}
                     placeholder="e.g. Silk crepe, raw woven linen"
-                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -252,7 +252,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     value={fit}
                     onChange={(e) => setFit(e.target.value)}
                     placeholder="e.g. Relaxed tailored, natural drape"
-                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -265,7 +265,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     value={sleeves}
                     onChange={(e) => setSleeves(e.target.value)}
                     placeholder="e.g. Sleeveless, clean armholes"
-                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -278,7 +278,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     value={neckline}
                     onChange={(e) => setNeckline(e.target.value)}
                     placeholder="e.g. Subtle high boat neckline"
-                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -291,7 +291,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     value={accessories}
                     onChange={(e) => setAccessories(e.target.value)}
                     placeholder="e.g. Delicate gold thin bangle on left wrist"
-                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -304,7 +304,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     value={footwear}
                     onChange={(e) => setFootwear(e.target.value)}
                     placeholder="e.g. Minimalist flat leather sandals"
-                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                    className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                   />
                 </div>
               </div>
@@ -317,7 +317,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAutoGenerateDescription}
-                    className="text-[10px] font-bold text-[#f5c518] hover:underline flex items-center gap-1"
+                    className="text-[10px] font-bold text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Sparkles className="w-3 h-3" />
                     <span>Auto-compose from fields</span>
@@ -328,7 +328,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Complete visual clothing description to be used in CLOTHING section of Master Prompt..."
-                  className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl p-3 text-xs text-white outline-none focus:border-[#f5c518] leading-relaxed"
+                  className="w-full bg-[#181b24] border border-[#2e3444] rounded-xl p-3 text-xs text-white outline-none focus:border-cyan-400 leading-relaxed"
                 />
               </div>
 
@@ -340,10 +340,10 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                 >
                   Cancel
                 </button>
-                <button
+                  <button
                   type="button"
                   onClick={handleSave}
-                  className="px-5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold"
+                  className="px-5 py-2 rounded-xl studio-cta-primary text-xs font-bold cursor-pointer"
                 >
                   Save Master Outfit
                 </button>
@@ -363,7 +363,7 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                     }}
                     className={`p-4 rounded-xl border transition cursor-pointer flex flex-col gap-2 ${
                       isActive
-                        ? 'bg-[#181c28] border-[#f5c518] shadow-md shadow-amber-500/10'
+                        ? 'bg-[#121927] border-cyan-400/75 shadow-md shadow-cyan-500/10'
                         : 'bg-[#141722] border-[#262a36] hover:border-[#383e50]'
                     }`}
                   >
@@ -371,12 +371,12 @@ export const MasterOutfitModal: React.FC<MasterOutfitModalProps> = ({
                       <div className="flex items-center gap-2">
                         <span
                           className={`w-2 h-2 rounded-full ${
-                            isActive ? 'bg-[#f5c518]' : 'bg-zinc-600'
+                            isActive ? 'bg-cyan-400' : 'bg-zinc-600'
                           }`}
                         />
                         <span className="font-extrabold text-sm text-white">{outfit.name}</span>
                         {isActive && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f5c518]/20 text-[#f5c518] border border-[#f5c518]/30">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/35">
                             Active Outfit
                           </span>
                         )}

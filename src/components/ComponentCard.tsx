@@ -214,7 +214,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
               }}
               className={`min-h-[40px] sm:min-h-[34px] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shrink-0 ${
                 component.selectedProfileName || isPickerOpen
-                  ? 'bg-[#f5c518]/15 text-[#f5c518] border border-[#f5c518]/45'
+                  ? 'bg-cyan-400/15 text-cyan-300 border border-cyan-400/45'
                   : 'bg-[#171b26] text-zinc-300 hover:text-white border border-white/[0.08]'
               }`}
             >
@@ -229,7 +229,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
             onClick={() => onUpdateState('locked')}
             className={`min-h-[40px] sm:min-h-[34px] px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition cursor-pointer whitespace-nowrap shrink-0 ${
               state === 'locked' && !isUnavailable
-                ? 'bg-[#f5c518] text-black font-bold'
+                ? 'bg-cyan-400 text-slate-950 font-bold'
                 : 'bg-[#171b26] text-zinc-400 hover:text-white border border-white/[0.08]'
             }`}
           >
@@ -348,7 +348,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                               {textToApply}
                             </div>
                           </div>
-                          <span className="text-[11px] font-bold text-[#f5c518] shrink-0">
+                          <span className="text-[11px] font-bold text-cyan-300 shrink-0">
                             Apply
                           </span>
                         </button>
@@ -380,7 +380,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                             {op.description}
                           </div>
                         </div>
-                        <span className="text-[11px] font-bold text-[#f5c518] shrink-0">
+                        <span className="text-[11px] font-bold text-cyan-300 shrink-0">
                           Apply
                         </span>
                       </button>
@@ -405,7 +405,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                             onChange={(e) =>
                               setBgApplyParts((p) => ({ ...p, background: e.target.checked }))
                             }
-                            className="accent-[#f5c518]"
+                            className="accent-cyan-400"
                           />
                           <span>Background</span>
                         </label>
@@ -416,7 +416,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                             onChange={(e) =>
                               setBgApplyParts((p) => ({ ...p, environment: e.target.checked }))
                             }
-                            className="accent-[#f5c518]"
+                            className="accent-cyan-400"
                           />
                           <span>Environment</span>
                         </label>
@@ -427,7 +427,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                             onChange={(e) =>
                               setBgApplyParts((p) => ({ ...p, lighting: e.target.checked }))
                             }
-                            className="accent-[#f5c518]"
+                            className="accent-cyan-400"
                           />
                           <span>Lighting</span>
                         </label>
@@ -468,7 +468,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                               {singleFieldText}
                             </div>
                           </div>
-                          <span className="text-[11px] font-bold text-[#f5c518] shrink-0">
+                          <span className="text-[11px] font-bold text-cyan-300 shrink-0">
                             Apply Selected
                           </span>
                         </button>
@@ -502,7 +502,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                             {item.description}
                           </div>
                         </div>
-                        <span className="text-[11px] font-bold text-[#f5c518] shrink-0">
+                        <span className="text-[11px] font-bold text-cyan-300 shrink-0">
                           Apply
                         </span>
                       </button>
@@ -520,7 +520,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
                 rows={4}
-                className="w-full bg-[#161922] border border-[#3b4256] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                className="w-full bg-[#161922] border border-[#3b4256] focus:border-cyan-400 text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
                 placeholder={`Enter or edit ${component.label.toLowerCase()} description...`}
               />
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -559,7 +559,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                   <button
                     type="button"
                     onClick={handleSaveEdit}
-                    className="px-3.5 py-1.5 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-lg flex items-center gap-1"
+                    className="px-3.5 py-1.5 studio-cta-primary text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>Apply Edit</span>
@@ -579,7 +579,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsEditing(true)}
-                        className="text-[#f5c518] underline font-medium"
+                        className="text-cyan-300 underline font-medium"
                       >
                         Edit
                       </button>{' '}
@@ -594,7 +594,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                     <button
                       type="button"
                       onClick={handleRestoreOriginal}
-                      className="text-[#f5c518] hover:underline font-semibold flex items-center gap-1 shrink-0"
+                      className="text-cyan-300 hover:underline font-semibold flex items-center gap-1 shrink-0"
                     >
                       <RotateCcw className="w-3 h-3" />
                       <span>Restore Original</span>
@@ -657,12 +657,12 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                           value={saveItemName}
                           onChange={(e) => setSaveItemName(e.target.value)}
                           placeholder={`Preset name for ${component.label}...`}
-                          className="bg-[#181b24] border border-[#343b4f] rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-[#f5c518]"
+                          className="bg-[#181b24] border border-[#343b4f] rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-cyan-400"
                         />
                         <button
                           type="button"
                           onClick={handleSaveCurrentToLibrary}
-                          className="px-2.5 py-1 bg-[#f5c518] text-black font-bold rounded-lg text-xs"
+                          className="px-2.5 py-1 bg-cyan-400 text-slate-950 font-bold rounded-lg text-xs cursor-pointer"
                         >
                           Save
                         </button>
@@ -681,7 +681,7 @@ export const ComponentCard: React.FC<ComponentCardProps> = ({
                           setSaveItemName(`${component.label} Preset`);
                           setIsSavingToLibrary(true);
                         }}
-                        className="text-zinc-400 hover:text-[#f5c518] flex items-center gap-1 transition"
+                        className="text-zinc-400 hover:text-cyan-300 flex items-center gap-1 transition cursor-pointer"
                       >
                         <Bookmark className="w-3 h-3" />
                         <span>Save to Library</span>

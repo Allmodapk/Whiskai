@@ -199,12 +199,15 @@ export interface CameraTransitionTarget {
   rollDeg: number;
 }
 
+export type ViewportInteractionMode = 'orbit' | 'pan' | 'scroll';
+
 export class PerspectiveCameraController {
   public readonly camera: THREE.PerspectiveCamera;
   public readonly controls: OrbitControls;
   public rollDeg = DEFAULT_CAMERA_CONFIG.rollDeg;
   public activeTransition: CameraTransitionTarget | null = null;
   public isLocked = false;
+  public interactionMode: ViewportInteractionMode = 'orbit';
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -232,14 +235,67 @@ export class PerspectiveCameraController {
     });
 
     this.applyImmediate(DEFAULT_CAMERA_CONFIG);
+    this.syncTouchAndInputState();
+  }
+
+  private syncTouchAndInputState(): void {
+    const canInteract = !this.isLocked && this.interactionMode !== 'scroll';
+    this.controls.enabled = canInteract;
+    if (this.controls.domElement) {
+      this.controls.domElement.style.touchAction = canInteract ? 'none' : 'pan-y';
+    }
+
+    if (this.interactionMode === 'pan') {
+      this.controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+      this.controls.touches.ONE = THREE.TOUCH.PAN;
+      this.controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
+    } else {
+      this.controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+      this.controls.touches.ONE = THREE.TOUCH.ROTATE;
+      this.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+    }
+  }
+
+  public setInteractionMode(mode: ViewportInteractionMode): void {
+    this.interactionMode = mode;
+    this.syncTouchAndInputState();
   }
 
   public setLocked(locked: boolean): void {
     this.isLocked = locked;
-    this.controls.enabled = !locked;
     if (locked) {
       this.activeTransition = null;
     }
+    this.syncTouchAndInputState();
+  }
+
+  public zoomBy(deltaMeters: number): void {
+    if (this.isLocked) return;
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const curDist = Math.max(0.01, offset.length());
+    const nextDist = THREE.MathUtils.clamp(
+      curDist + deltaMeters,
+      CAMERA_LIMITS.minDistanceMeters,
+      CAMERA_LIMITS.maxDistanceMeters
+    );
+    const curAz = THREE.MathUtils.radToDeg(Math.atan2(offset.x, offset.z));
+    const curEl = THREE.MathUtils.radToDeg(
+      Math.atan2(offset.y, Math.hypot(offset.x, offset.z))
+    );
+    this.animateTo({
+      azimuthDeg: curAz,
+      elevationDeg: curEl,
+      distanceMeters: nextDist,
+      focalLengthMm: Math.round(
+        24 / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)))
+      ),
+      targetOffset: {
+        x: this.controls.target.x,
+        y: this.controls.target.y,
+        z: this.controls.target.z,
+      },
+      rollDeg: this.rollDeg,
+    });
   }
 
   public setFocalLengthMm(focalLengthMm: number): void {

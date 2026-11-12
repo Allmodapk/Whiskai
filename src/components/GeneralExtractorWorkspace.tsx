@@ -214,7 +214,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
       {/* Workspace Header Strip */}
       <div className="studio-panel rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-[#f5c518]/15 border border-[#f5c518]/35 flex items-center justify-center text-[#f5c518] shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-cyan-400/15 border border-cyan-400/35 flex items-center justify-center text-cyan-300 shrink-0">
             <FileSearch className="w-4 h-4" />
           </div>
           <div className="min-w-0">
@@ -252,7 +252,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
             <button
               type="button"
               onClick={onAcknowledgeQuotaFallback}
-              className="min-h-[40px] px-4 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer whitespace-nowrap"
+              className="min-h-[40px] px-4 py-2 rounded-xl studio-cta-primary font-bold text-xs transition cursor-pointer whitespace-nowrap"
             >
               Acknowledge &amp; Continue
             </button>
@@ -289,15 +289,15 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
           onClick={() => !referenceImage && onOpenFilePicker()}
           className={`relative rounded-2xl border-2 border-dashed p-5 sm:p-6 transition-all ${
             isDragging
-              ? 'border-[#f5c518] bg-[#f5c518]/5'
+              ? 'border-cyan-400 bg-cyan-400/5'
               : !referenceImage
-              ? 'border-white/15 studio-panel hover:border-[#f5c518]/50 cursor-pointer text-center'
+              ? 'border-white/15 studio-panel hover:border-cyan-400/50 cursor-pointer text-center'
               : 'border-white/10 studio-panel'
           }`}
         >
           {!referenceImage ? (
             <div className="flex flex-col items-center gap-2.5 text-zinc-400 py-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-[#f5c518]">
+              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-cyan-300">
                 <Upload className="w-5 h-5" />
               </div>
               <div>
@@ -308,7 +308,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                   JPEG, PNG, WebP · Or paste directly with Ctrl + V
                 </span>
               </div>
-              <span className="text-xs font-semibold text-[#f5c518] underline mt-0.5">
+              <span className="text-xs font-semibold text-cyan-300 underline mt-0.5">
                 Browse file from device
               </span>
             </div>
@@ -330,7 +330,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
 
               <div className="flex-1 space-y-3 w-full">
                 <div>
-                  <div className="text-xs font-mono font-medium text-[#f5c518]">
+                  <div className="text-xs font-mono font-medium text-cyan-300">
                     Optical Source · 13-Component Extraction
                   </div>
                   <div className="font-display text-sm sm:text-base font-bold text-white truncate mt-0.5">
@@ -346,7 +346,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                     type="button"
                     onClick={onScanReference}
                     disabled={isScanning}
-                    className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer flex-1 sm:flex-initial"
+                    className="min-h-[44px] px-5 py-2.5 rounded-xl studio-cta-primary font-bold text-xs shadow-md transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer flex-1 sm:flex-initial"
                   >
                     <Sparkles className="w-4 h-4 stroke-[2.2]" />
                     <span>{components ? 'Re-Analyze Image' : 'Analyze Reference Image'}</span>
@@ -387,7 +387,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
             <button
               type="button"
               onClick={onScanReference}
-              className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              className="min-h-[40px] px-3.5 py-2 rounded-xl studio-cta-primary font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Retry Analysis</span>
@@ -414,7 +414,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
             <button
               type="button"
               onClick={onScanReference}
-              className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              className="min-h-[40px] px-3.5 py-2 rounded-xl studio-cta-primary font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Retry</span>
@@ -613,12 +613,12 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                   type="button"
                   onClick={onRewriteFieldsSolo}
                   disabled={isRewritingFields}
-                  className="min-h-[40px] px-4 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+                  className="min-h-[40px] px-4 py-2 rounded-xl studio-cta-primary font-bold text-xs transition flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
                 >
                   {isRewritingFields ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-black" />
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                   ) : (
-                    <Sparkles className="w-4 h-4 text-black" />
+                    <Sparkles className="w-4 h-4 text-slate-950" />
                   )}
                   <span>Rewrite for Solo</span>
                 </button>
@@ -663,7 +663,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                 onClick={onOpenChecklistModal}
                 className="min-h-[40px] sm:min-h-[36px] px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 text-xs font-semibold border border-white/10 transition flex items-center gap-1.5 cursor-pointer"
               >
-                <ListChecks className="w-3.5 h-3.5 text-[#f5c518]" />
+                <ListChecks className="w-3.5 h-3.5 text-cyan-300" />
                 <span>Selection ({tickedComponentKeys.length}/13)</span>
               </button>
 
@@ -682,12 +682,12 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                   value={projectTitleInput}
                   onChange={(e) => onChangeProjectTitleInput(e.target.value)}
                   placeholder="Project title..."
-                  className="min-h-[40px] sm:min-h-[36px] bg-black/45 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-1.5 text-xs text-white outline-none flex-1 sm:w-44"
+                  className="min-h-[40px] sm:min-h-[36px] bg-black/45 border border-white/15 focus:border-cyan-400 rounded-xl px-3 py-1.5 text-xs text-white outline-none flex-1 sm:w-44"
                 />
                 <button
                   type="button"
                   onClick={onSaveBlueprint}
-                  className="min-h-[40px] sm:min-h-[36px] flex items-center gap-1.5 px-3.5 py-1.5 bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs rounded-xl transition cursor-pointer whitespace-nowrap shrink-0"
+                  className="min-h-[40px] sm:min-h-[36px] flex items-center gap-1.5 px-3.5 py-1.5 studio-cta-primary font-bold text-xs rounded-xl transition cursor-pointer whitespace-nowrap shrink-0"
                 >
                   <BookmarkPlus className="w-3.5 h-3.5" />
                   <span>Save Project</span>
@@ -725,7 +725,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                   <label className="font-display text-xs font-bold text-white">
                     Output Aspect Ratio
                   </label>
-                  <span className="text-xs font-mono font-semibold text-[#f5c518] tabular-nums">
+                  <span className="text-xs font-mono font-semibold text-cyan-300 tabular-nums">
                     {outputRatio}
                   </span>
                 </div>
@@ -741,7 +741,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                         onClick={() => onChangeOutputRatio(ratio)}
                         className={`min-h-[36px] sm:min-h-[32px] px-2.5 py-1 rounded-lg text-xs font-mono font-semibold tabular-nums transition cursor-pointer ${
                           outputRatio === ratio
-                            ? 'bg-[#f5c518] text-black font-bold'
+                            ? 'bg-cyan-400 text-slate-950 font-bold'
                             : 'bg-white/[0.05] text-zinc-400 hover:text-white border border-white/10'
                         }`}
                       >
@@ -825,7 +825,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                     >
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <span className="font-mono text-xs font-semibold text-[#f5c518] tabular-nums">
+                          <span className="font-mono text-xs font-semibold text-cyan-300 tabular-nums">
                             {group.codes}
                           </span>
                           <span className="font-display font-bold text-sm sm:text-base text-white">
@@ -844,7 +844,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
 
                       <div className="w-8 h-8 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-zinc-300 shrink-0">
                         {isGroupOpen ? (
-                          <ChevronUp className="w-4 h-4 text-[#f5c518]" />
+                          <ChevronUp className="w-4 h-4 text-cyan-300" />
                         ) : (
                           <ChevronDown className="w-4 h-4" />
                         )}
@@ -918,9 +918,9 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
             <button
               type="button"
               onClick={onGenerateFinalPrompt}
-              className="min-h-[46px] px-6 py-3 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs sm:text-sm shadow-md transition inline-flex items-center justify-center gap-2 cursor-pointer shrink-0"
+              className="min-h-[46px] px-6 py-3 rounded-xl studio-cta-primary font-bold text-xs sm:text-sm shadow-md transition inline-flex items-center justify-center gap-2 cursor-pointer shrink-0"
             >
-              <Sparkles className="w-4 h-4 text-black stroke-[2.2]" />
+              <Sparkles className="w-4 h-4 stroke-[2.2]" />
               <span>Generate Final Prompt</span>
             </button>
           </div>
@@ -934,7 +934,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                 <button
                   type="button"
                   onClick={onGenerateFinalPrompt}
-                  className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  className="min-h-[40px] px-3.5 py-2 rounded-xl studio-cta-primary font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Rebuild Prompt</span>
@@ -964,7 +964,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                       type="checkbox"
                       checked={showNegativePrompt}
                       onChange={(e) => onSetShowNegativePrompt(e.target.checked)}
-                      className="accent-[#f5c518]"
+                      className="accent-cyan-400"
                     />
                     <span>Show Negative Prompt</span>
                   </label>
@@ -974,7 +974,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                     <select
                       value={targetModel}
                       onChange={(e) => onSetTargetModel(e.target.value as TargetModelType)}
-                      className="min-h-[36px] bg-black/50 text-white border border-white/15 rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-[#f5c518]"
+                      className="min-h-[36px] bg-black/50 text-white border border-white/15 rounded-xl px-3 py-1.5 text-xs font-semibold outline-none focus:border-cyan-400"
                     >
                       <option value="universal" className="bg-[#0e1118]">
                         Universal / Standard
@@ -1001,7 +1001,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                 readOnly
                 value={exportedPrompt}
                 rows={13}
-                className="w-full bg-[#090b10] border border-white/10 text-white p-4 rounded-xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-[#f5c518] selection:text-black resize-y min-h-[220px]"
+                className="w-full bg-[#090b10] border border-white/10 text-white p-4 rounded-xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-cyan-400 selection:text-slate-950 resize-y min-h-[220px]"
               />
 
               {showNegativePrompt && generatedNegativePrompt && (
@@ -1022,11 +1022,11 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                 <button
                   type="button"
                   onClick={onCopyPrompt}
-                  className="min-h-[44px] py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="min-h-[44px] py-2.5 px-4 rounded-xl studio-cta-primary font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {copyFeedback ? (
                     <>
-                      <Check className="w-4 h-4 text-black" />
+                      <Check className="w-4 h-4" />
                       <span>Copied to Clipboard</span>
                     </>
                   ) : (
@@ -1051,7 +1051,7 @@ export const GeneralExtractorWorkspace: React.FC<GeneralExtractorWorkspaceProps>
                   onClick={onSaveBlueprint}
                   className="min-h-[44px] py-2.5 px-4 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 font-semibold text-xs transition flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
                 >
-                  <BookmarkPlus className="w-4 h-4 text-[#f5c518]" />
+                  <BookmarkPlus className="w-4 h-4 text-cyan-300" />
                   <span>Save to Projects</span>
                 </button>
               </div>

@@ -392,7 +392,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-[#f5c518]/15 border border-[#f5c518]/35 flex items-center justify-center text-[#f5c518] shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-cyan-400/15 border border-cyan-400/35 flex items-center justify-center text-cyan-300 shrink-0">
                 <Camera className="w-4 h-4" />
               </div>
               <h2 className="font-display text-base sm:text-lg font-bold text-white">
@@ -409,12 +409,12 @@ export const CameraAI: React.FC<CameraAIProps> = ({
               type="button"
               disabled={isScanningTemplate || isScanningBase}
               onClick={handleScanBoth}
-              className="min-h-[42px] px-4 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="min-h-[42px] px-4 py-2 rounded-xl studio-cta-primary font-bold text-xs shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
             >
               {isScanningTemplate || isScanningBase ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-black" />
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.2]" />
+                <Sparkles className="w-3.5 h-3.5 stroke-[2.2]" />
               )}
               <span>Scan Both Images</span>
             </button>
@@ -458,9 +458,9 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 <button
                   type="button"
                   onClick={() => templateInputRef.current?.click()}
-                  className="w-full aspect-[4/3] rounded-xl border-2 border-dashed border-white/15 hover:border-[#f5c518]/60 flex flex-col items-center justify-center gap-2 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
+                  className="w-full aspect-[4/3] rounded-xl border-2 border-dashed border-white/15 hover:border-cyan-400/60 flex flex-col items-center justify-center gap-2 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
                 >
-                  <Upload className="w-6 h-6 text-[#f5c518]" />
+                  <Upload className="w-6 h-6 text-cyan-300" />
                   <span className="text-xs font-bold">Upload Camera Template</span>
                   <span className="text-[10px] text-zinc-500">Resized to 1024px JPEG</span>
                 </button>
@@ -480,7 +480,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                   type="button"
                   disabled={!templateImage || isScanningTemplate}
                   onClick={handleScanTemplate}
-                  className="flex-1 py-2 px-3 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 px-3 rounded-xl studio-cta-primary font-bold text-xs transition disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {isScanningTemplate ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -575,7 +575,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
             <div>
               <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-[#f5c518]" />
+                <Sliders className="w-4 h-4 text-cyan-300" />
                 <span>Extracted Camera Parameters (Editable)</span>
               </h3>
               <p className="text-xs text-zinc-400">
@@ -635,7 +635,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <label className="font-bold text-white">Pitch Angle (Degrees)</label>
-                <span className="font-mono text-[#f5c518] font-bold">
+                <span className="font-mono text-cyan-300 font-bold">
                   {templateAnalysis.estimates.pitch_deg}°
                 </span>
               </div>
@@ -646,12 +646,12 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 step={1}
                 value={templateAnalysis.estimates.pitch_deg}
                 onChange={(e) => updateTemplateEstimate('pitch_deg', parseInt(e.target.value, 10))}
-                className="w-full accent-[#f5c518]"
+                className="w-full accent-cyan-400"
               />
               <select
                 value={templateAnalysis.estimates.pitch_label}
                 onChange={(e) => updateTemplateEstimate('pitch_label', e.target.value)}
-                className="w-full bg-black/60 border border-white/15 focus:border-[#f5c518] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
+                className="w-full bg-black/60 border border-white/15 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
               >
                 <option value="top-down" className="bg-[#0e111a]">top-down (-90° to -75°)</option>
                 <option value="bird's-eye" className="bg-[#0e111a]">bird&apos;s-eye (-75° to -45°)</option>
@@ -666,7 +666,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <label className="font-bold text-white">Camera Height</label>
-                <span className="font-mono text-[#f5c518] font-bold">
+                <span className="font-mono text-cyan-300 font-bold">
                   {templateAnalysis.estimates.camera_height_meters}m
                 </span>
               </div>
@@ -679,12 +679,12 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 onChange={(e) =>
                   updateTemplateEstimate('camera_height_meters', parseFloat(e.target.value) || 1.6)
                 }
-                className="w-full bg-black/60 border border-white/15 focus:border-[#f5c518] rounded-lg px-2.5 py-1 text-xs text-white outline-none"
+                className="w-full bg-black/60 border border-white/15 focus:border-cyan-400 rounded-lg px-2.5 py-1 text-xs text-white outline-none"
               />
               <select
                 value={templateAnalysis.estimates.camera_height}
                 onChange={(e) => updateTemplateEstimate('camera_height', e.target.value)}
-                className="w-full bg-black/60 border border-white/15 focus:border-[#f5c518] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
+                className="w-full bg-black/60 border border-white/15 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
               >
                 <option value="below ground level" className="bg-[#0e111a]">below ground level</option>
                 <option value="floor level" className="bg-[#0e111a]">floor level</option>
@@ -703,7 +703,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <label className="font-bold text-white">Azimuth Orbit Angle</label>
-                <span className="font-mono text-[#f5c518] font-bold">
+                <span className="font-mono text-cyan-300 font-bold">
                   {templateAnalysis.estimates.azimuth_deg}°
                 </span>
               </div>
@@ -716,7 +716,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 onChange={(e) =>
                   updateTemplateEstimate('azimuth_deg', parseInt(e.target.value, 10))
                 }
-                className="w-full accent-[#f5c518]"
+                className="w-full accent-cyan-400"
               />
               <input
                 type="text"
@@ -725,7 +725,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                   updateTemplateEstimate('azimuth_reference_axis', e.target.value)
                 }
                 placeholder="Reference axis (e.g. Subject facing)..."
-                className="w-full bg-black/60 border border-white/15 focus:border-[#f5c518] rounded-lg px-2.5 py-1 text-xs text-white outline-none"
+                className="w-full bg-black/60 border border-white/15 focus:border-cyan-400 rounded-lg px-2.5 py-1 text-xs text-white outline-none"
               />
             </div>
 
@@ -733,7 +733,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <label className="font-bold text-white">Distance</label>
-                <span className="font-mono text-[#f5c518] font-bold">
+                <span className="font-mono text-cyan-300 font-bold">
                   {templateAnalysis.estimates.distance_meters}m
                 </span>
               </div>
@@ -745,7 +745,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                     e.target.value as CameraAiTemplateAnalysis['estimates']['distance_label']
                   )
                 }
-                className="w-full bg-black/60 border border-white/15 focus:border-[#f5c518] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
+                className="w-full bg-black/60 border border-white/15 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
               >
                 <option value="extreme close" className="bg-[#0e111a]">extreme close</option>
                 <option value="close" className="bg-[#0e111a]">close</option>
@@ -759,7 +759,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <label className="font-bold text-white">Focal Length (35mm Eq)</label>
-                <span className="font-mono text-[#f5c518] font-bold">
+                <span className="font-mono text-cyan-300 font-bold">
                   {templateAnalysis.estimates.focal_length_mm}mm
                 </span>
               </div>
@@ -772,7 +772,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 onChange={(e) =>
                   updateTemplateEstimate('focal_length_mm', parseInt(e.target.value, 10) || 50)
                 }
-                className="w-full bg-black/60 border border-white/15 focus:border-[#f5c518] rounded-lg px-2.5 py-1 text-xs text-white outline-none"
+                className="w-full bg-black/60 border border-white/15 focus:border-cyan-400 rounded-lg px-2.5 py-1 text-xs text-white outline-none"
               />
             </div>
 
@@ -780,7 +780,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <label className="font-bold text-white">Roll Angle (Dutch Tilt)</label>
-                <span className="font-mono text-[#f5c518] font-bold">
+                <span className="font-mono text-cyan-300 font-bold">
                   {templateAnalysis.estimates.roll_deg}°
                 </span>
               </div>
@@ -791,7 +791,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 step={1}
                 value={templateAnalysis.estimates.roll_deg}
                 onChange={(e) => updateTemplateEstimate('roll_deg', parseInt(e.target.value, 10))}
-                className="w-full accent-[#f5c518]"
+                className="w-full accent-cyan-400"
               />
             </div>
           </div>
@@ -800,7 +800,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           <div className="p-4 rounded-xl bg-black/50 border border-white/10 space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-white flex items-center gap-1.5">
-                <Compass className="w-4 h-4 text-[#f5c518]" />
+                <Compass className="w-4 h-4 text-cyan-300" />
                 <span>Spatial Camera Setup Diagram (Camera B vs New Camera C)</span>
               </span>
               <span className="font-mono text-zinc-400 text-[11px]">
@@ -815,8 +815,8 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 <line x1="-100" y1="40" x2="100" y2="40" stroke="#475569" strokeWidth="1" />
 
                 {/* Subject Marker in Center */}
-                <circle cx="0" cy="35" r="7" fill="#f5c518" />
-                <text x="0" y="55" textAnchor="middle" fill="#f5c518" fontSize="9" fontWeight="bold">
+                <circle cx="0" cy="35" r="7" fill="#22d3ee" />
+                <text x="0" y="55" textAnchor="middle" fill="#22d3ee" fontSize="9" fontWeight="bold">
                   Subject (Facing ↓)
                 </text>
 
@@ -857,7 +857,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
             <div>
               <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[#f5c518]" />
+                <FileText className="w-4 h-4 text-cyan-300" />
                 <span>Camera AI Generated Prompt</span>
               </h3>
               <p className="text-xs text-zinc-400">
@@ -881,7 +881,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                     onClick={() => setActiveVariant(v.id)}
                     className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
                       activeVariant === v.id
-                        ? 'bg-[#f5c518] text-black font-bold'
+                        ? 'bg-cyan-400 text-slate-950 font-bold'
                         : 'text-zinc-400 hover:text-white'
                     }`}
                   >
@@ -893,7 +893,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
               <select
                 value={targetModel}
                 onChange={(e) => setTargetModel(e.target.value as TargetModelType)}
-                className="min-h-[38px] bg-black/60 text-white border border-white/15 rounded-xl px-3 py-1.5 text-xs font-bold outline-none"
+                className="min-h-[38px] bg-black/60 text-white border border-white/15 rounded-xl px-3 py-1.5 text-xs font-bold outline-none focus:border-cyan-400"
               >
                 <option value="universal" className="bg-[#0e111a]">Universal / Standard</option>
                 <option value="gemini" className="bg-[#0e111a]">Google Gemini</option>
@@ -908,7 +908,7 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             readOnly
             value={finalPrompt}
             rows={16}
-            className="w-full bg-[#090b10] border border-white/10 text-white p-4 rounded-xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-[#f5c518] selection:text-black resize-y min-h-[260px]"
+            className="w-full bg-[#090b10] border border-white/10 text-white p-4 rounded-xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-cyan-400 selection:text-slate-950 resize-y min-h-[260px]"
           />
 
           {/* Bottom Action Bar */}
@@ -919,14 +919,14 @@ export const CameraAI: React.FC<CameraAIProps> = ({
                 value={projectTitle}
                 onChange={(e) => setProjectTitle(e.target.value)}
                 placeholder="Project title..."
-                className="min-h-[42px] bg-black/40 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-2 text-xs text-white outline-none flex-1 sm:w-48"
+                className="min-h-[42px] bg-black/40 border border-white/15 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-white outline-none flex-1 sm:w-48"
               />
               <button
                 type="button"
                 onClick={handleSaveAsProject}
                 className="min-h-[42px] px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold text-xs border border-white/15 flex items-center gap-1.5 transition cursor-pointer shrink-0"
               >
-                <BookmarkPlus className="w-3.5 h-3.5 text-[#f5c518]" />
+                <BookmarkPlus className="w-3.5 h-3.5 text-cyan-300" />
                 <span>Save Project</span>
               </button>
             </div>
@@ -934,16 +934,16 @@ export const CameraAI: React.FC<CameraAIProps> = ({
             <button
               type="button"
               onClick={handleCopyPrompt}
-              className="w-full sm:w-auto min-w-[200px] min-h-[44px] py-3 px-6 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto min-w-[200px] min-h-[44px] py-3 px-6 rounded-xl studio-cta-primary font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
             >
               {copySuccess ? (
                 <>
-                  <Check className="w-4 h-4 text-black stroke-[2.5]" />
+                  <Check className="w-4 h-4 stroke-[2.5]" />
                   <span>Copied Camera AI Prompt!</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4 text-black stroke-[2.5]" />
+                  <Copy className="w-4 h-4 stroke-[2.5]" />
                   <span>Copy Prompt</span>
                 </>
               )}

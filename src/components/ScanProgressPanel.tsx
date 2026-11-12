@@ -23,7 +23,7 @@ export const ScanProgressPanel: React.FC<ScanProgressPanelProps> = ({ currentSta
   return (
     <div className="w-full max-w-xl mx-auto rounded-2xl glass-panel p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
       <div className="flex items-center gap-3 mb-5 border-b border-white/[0.08] pb-4">
-        <div className="w-9 h-9 rounded-xl bg-[#f5c518]/15 border border-[#f5c518]/30 flex items-center justify-center text-[#f5c518]">
+        <div className="w-9 h-9 rounded-xl bg-cyan-400/15 border border-cyan-400/35 flex items-center justify-center text-cyan-300">
           <Sparkles className="w-5 h-5 animate-pulse" />
         </div>
         <div>
@@ -56,7 +56,7 @@ export const ScanProgressPanel: React.FC<ScanProgressPanelProps> = ({ currentSta
                 {isDone ? (
                   <Check className="w-4 h-4 text-emerald-400" />
                 ) : isCurrent ? (
-                  <Loader2 className="w-4 h-4 text-[#f5c518] animate-spin" />
+                  <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
                 ) : (
                   <span className="w-2 h-2 rounded-full bg-zinc-800" />
                 )}
@@ -68,7 +68,7 @@ export const ScanProgressPanel: React.FC<ScanProgressPanelProps> = ({ currentSta
       </div>
 
       <div className="mt-6 pt-4 border-t border-[#1f232d] flex items-center justify-between text-[11px] text-zinc-500">
-        <span>My Whisk AI</span>
+        <span>Whiskai Studio</span>
         <span>13-Component Grounded Analysis</span>
       </div>
     </div>

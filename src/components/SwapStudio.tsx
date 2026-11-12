@@ -775,7 +775,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
             onClick={() => setMobileSection(tab.id)}
             className={`min-h-[40px] px-2 py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
               mobileSection === tab.id
-                ? 'bg-[#f5c518] text-black font-bold'
+                ? 'bg-cyan-400 text-slate-950 font-bold'
                 : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -838,7 +838,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 Swap Studio · Recipe &amp; Source Matrix
               </h2>
               <span className="text-zinc-600" aria-hidden="true">·</span>
-              <span className="text-xs font-mono text-[#f5c518]">Deterministic Builder</span>
+              <span className="text-xs font-mono text-cyan-300">Deterministic Builder</span>
             </div>
             <p className="text-xs text-zinc-400 mt-0.5">
               Choose one of the 4 locked presets (verbatim prompt output) or duplicate a recipe to customize the Source Matrix switches.
@@ -849,7 +849,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
             <button
               type="button"
               onClick={() => handleDuplicateAndEdit()}
-              className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              className="min-h-[40px] px-3.5 py-2 rounded-xl studio-cta-primary font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
             >
               <CopyPlus className="w-3.5 h-3.5" />
               <span>Duplicate and edit</span>
@@ -870,7 +870,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 onClick={() => handleSelectRecipe(recipe)}
                 className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-2 ${
                   isSelected
-                    ? 'bg-[#f5c518]/12 border-[#f5c518]'
+                    ? 'bg-cyan-400/10 border-cyan-400/70'
                     : 'bg-white/[0.025] border-white/10 hover:border-white/25 hover:bg-white/[0.04]'
                 }`}
               >
@@ -878,7 +878,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   <div className="flex items-center justify-between gap-1.5">
                     <span className="font-display text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 truncate">
                       {recipe.isLockedPreset ? (
-                        <Lock className="w-3.5 h-3.5 text-[#f5c518] shrink-0" />
+                        <Lock className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
                       ) : (
                         <Sliders className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       )}
@@ -924,7 +924,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                     type="text"
                     value={editingRecipeName}
                     onChange={(e) => setEditingRecipeName(e.target.value)}
-                    className="bg-black/60 border border-[#f5c518] rounded-lg px-2.5 py-1 text-xs text-white outline-none"
+                    className="bg-black/60 border border-cyan-400 rounded-lg px-2.5 py-1 text-xs text-white outline-none"
                     placeholder="Recipe name..."
                   />
                   <button
@@ -938,7 +938,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                       }
                       setIsRenamingRecipe(false);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-[#f5c518] text-black font-bold cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg bg-cyan-400 text-slate-950 font-bold cursor-pointer"
                   >
                     Save
                   </button>
@@ -1001,7 +1001,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
           <div>
             <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-[#f5c518]" />
+              <ImageIcon className="w-4 h-4 text-cyan-300" />
               <span>Reference Image Slots (Max 4 · Resized to 1024px)</span>
             </h3>
             <p className="text-xs text-zinc-400">
@@ -1019,7 +1019,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 onClick={() => setPeopleCount(cnt)}
                 className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
                   peopleCount === cnt
-                    ? 'bg-[#f5c518] text-black'
+                    ? 'bg-cyan-400 text-slate-950'
                     : 'bg-white/[0.06] text-zinc-400 hover:text-white'
                 }`}
               >
@@ -1064,9 +1064,9 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => templateInputRef.current?.click()}
-                  className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-white/15 hover:border-[#f5c518]/60 flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
+                  className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-white/15 hover:border-cyan-400/60 flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
                 >
-                  <Upload className="w-5 h-5 text-[#f5c518]" />
+                  <Upload className="w-5 h-5 text-cyan-300" />
                   <span className="text-xs font-semibold">Upload Template</span>
                 </button>
               )}
@@ -1085,7 +1085,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   type="button"
                   disabled={!templateImage || isScanningTemplate}
                   onClick={handleScanTemplateOptional}
-                  className="flex-1 py-1.5 px-2.5 rounded-lg bg-[#f5c518]/15 hover:bg-[#f5c518]/25 text-[#f5c518] border border-[#f5c518]/30 text-[11px] font-bold transition disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1"
+                  className="flex-1 py-1.5 px-2.5 rounded-lg bg-cyan-400/15 hover:bg-cyan-400/25 text-cyan-300 border border-cyan-400/35 text-[11px] font-bold transition disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1"
                   title="Optional scan for people count, scene type, and visible body parts"
                 >
                   {isScanningTemplate ? (
@@ -1132,9 +1132,9 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => faceInputRef.current?.click()}
-                  className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-white/15 hover:border-[#f5c518]/60 flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
+                  className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-white/15 hover:border-cyan-400/60 flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
                 >
-                  <Upload className="w-5 h-5 text-[#f5c518]" />
+                  <Upload className="w-5 h-5 text-cyan-300" />
                   <span className="text-xs font-semibold">Upload Face</span>
                 </button>
               )}
@@ -1146,7 +1146,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   type="checkbox"
                   checked={faceShowsOnlyUpperBody}
                   onChange={(e) => setFaceShowsOnlyUpperBody(e.target.checked)}
-                  className="accent-[#f5c518]"
+                  className="accent-cyan-400"
                 />
                 <span>Face shows upper body only</span>
               </label>
@@ -1155,7 +1155,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   type="checkbox"
                   checked={faceHasClearExpression}
                   onChange={(e) => setFaceHasClearExpression(e.target.checked)}
-                  className="accent-[#f5c518]"
+                  className="accent-cyan-400"
                 />
                 <span>Face has clear expression</span>
               </label>
@@ -1168,7 +1168,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 {isDescribingFace ? (
                   <RefreshCw className="w-3 h-3 animate-spin" />
                 ) : (
-                  <Sparkles className="w-3 h-3 text-[#f5c518]" />
+                  <Sparkles className="w-3 h-3 text-cyan-300" />
                 )}
                 <span>Describe Face lighting and outfit</span>
               </button>
@@ -1178,7 +1178,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
           {/* SLOT 3: MANNEQUIN (OPTIONAL) */}
           <div
             className={`p-3.5 rounded-xl studio-card flex flex-col justify-between gap-3 ${
-              switches.body === 'mannequin' ? 'border-[#f5c518]/50' : ''
+              switches.body === 'mannequin' ? 'border-cyan-400/50' : ''
             }`}
           >
             <div className="space-y-2">
@@ -1186,7 +1186,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <span className="font-display text-xs font-bold text-white">3. Mannequin</span>
                 <span
                   className={`text-[11px] font-mono ${
-                    switches.body === 'mannequin' ? 'text-[#f5c518] font-medium' : 'text-zinc-400'
+                    switches.body === 'mannequin' ? 'text-cyan-300 font-medium' : 'text-zinc-400'
                   }`}
                 >
                   {switches.body === 'mannequin' ? 'Active in Matrix' : 'Optional'}
@@ -1216,7 +1216,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => mannequinInputRef.current?.click()}
-                  className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-white/15 hover:border-[#f5c518]/60 flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
+                  className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-white/15 hover:border-cyan-400/60 flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
                 >
                   <Upload className="w-5 h-5 text-zinc-400" />
                   <span className="text-xs font-semibold">Upload Mannequin</span>
@@ -1241,7 +1241,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 {isDescribingMannequin ? (
                   <RefreshCw className="w-3 h-3 animate-spin" />
                 ) : (
-                  <Sparkles className="w-3 h-3 text-[#f5c518]" />
+                  <Sparkles className="w-3 h-3 text-cyan-300" />
                 )}
                 <span>Describe Mannequin build</span>
               </button>
@@ -1251,7 +1251,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
           {/* SLOT 4: MAN (OPTIONAL) */}
           <div
             className={`p-3.5 rounded-xl studio-card flex flex-col justify-between gap-3 ${
-              peopleCount === 2 && secondPersonSwapped ? 'border-[#f5c518]/50' : ''
+              peopleCount === 2 && secondPersonSwapped ? 'border-cyan-400/50' : ''
             }`}
           >
             <div className="space-y-2">
@@ -1260,7 +1260,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <span
                   className={`text-[11px] font-mono ${
                     peopleCount === 2 && secondPersonSwapped
-                      ? 'text-[#f5c518] font-medium'
+                      ? 'text-cyan-300 font-medium'
                       : 'text-zinc-400'
                   }`}
                 >
@@ -1291,7 +1291,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => manInputRef.current?.click()}
-                  className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-white/15 hover:border-[#f5c518]/60 flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
+                  className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-white/15 hover:border-cyan-400/60 flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white transition cursor-pointer bg-black/20"
                 >
                   <Upload className="w-5 h-5 text-zinc-400" />
                   <span className="text-xs font-semibold">Upload Man</span>
@@ -1306,7 +1306,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                     type="checkbox"
                     checked={secondPersonSwapped}
                     onChange={(e) => setSecondPersonSwapped(e.target.checked)}
-                    className="accent-[#f5c518]"
+                    className="accent-cyan-400"
                   />
                   <span>Swap 2nd person with Man image</span>
                 </label>
@@ -1372,7 +1372,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                       onClick={() => setSwappedPersonId(subj.id)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
                         swappedPersonId === subj.id
-                          ? 'bg-[#f5c518] text-black font-bold'
+                          ? 'bg-cyan-400 text-slate-950 font-bold'
                           : 'bg-white/[0.06] text-zinc-300 hover:text-white'
                       }`}
                     >
@@ -1394,7 +1394,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.08] pb-3">
           <div>
             <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#f5c518]" />
+              <Layers className="w-4 h-4 text-cyan-300" />
               <span>Source Matrix (Every Row Defaults to Template)</span>
             </h3>
             <p className="text-xs text-zinc-400">
@@ -1433,7 +1433,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   onClick={() => handleSwitchChange('body', opt.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     switches.body === opt.id
-                      ? 'bg-[#f5c518] text-black font-bold'
+                      ? 'bg-cyan-400 text-slate-950 font-bold'
                       : 'bg-white/[0.06] text-zinc-300 hover:text-white'
                   }`}
                 >
@@ -1467,7 +1467,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                     onClick={() => handleSwitchChange('outfit', opt.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                       switches.outfit === opt.id
-                        ? 'bg-[#f5c518] text-black font-bold'
+                        ? 'bg-cyan-400 text-slate-950 font-bold'
                         : 'bg-white/[0.06] text-zinc-300 hover:text-white'
                     }`}
                   >
@@ -1483,7 +1483,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <select
                   value={savedOutfitId}
                   onChange={(e) => setSavedOutfitId(e.target.value)}
-                  className="flex-1 bg-black/50 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                  className="flex-1 bg-black/50 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                 >
                   {savedOutfits.map((o) => (
                     <option key={o.id} value={o.id} className="bg-[#0e111a]">
@@ -1501,7 +1501,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   value={typedOutfitText}
                   onChange={(e) => setTypedOutfitText(e.target.value)}
                   placeholder="Type custom outfit description (fabric, color, cut, footwear)..."
-                  className="w-full bg-black/50 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-2 text-xs text-white outline-none"
+                  className="w-full bg-black/50 border border-white/15 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-white outline-none"
                 />
               </div>
             )}
@@ -1517,7 +1517,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   value={typedBottomWearLine}
                   onChange={(e) => setTypedBottomWearLine(e.target.value)}
                   placeholder="Leave blank for verbatim preset, or specify lower garment..."
-                  className="flex-1 bg-black/50 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-1.5 text-xs text-white outline-none"
+                  className="flex-1 bg-black/50 border border-white/15 focus:border-cyan-400 rounded-xl px-3 py-1.5 text-xs text-white outline-none"
                 />
               </div>
             )}
@@ -1546,7 +1546,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   onClick={() => handleSwitchChange('expression', opt.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     switches.expression === opt.id
-                      ? 'bg-[#f5c518] text-black font-bold'
+                      ? 'bg-cyan-400 text-slate-950 font-bold'
                       : 'bg-white/[0.06] text-zinc-300 hover:text-white'
                   }`}
                 >
@@ -1582,7 +1582,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                     onClick={() => handleSwitchChange('background', opt.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                       switches.background === opt.id
-                        ? 'bg-[#f5c518] text-black font-bold'
+                        ? 'bg-cyan-400 text-slate-950 font-bold'
                         : 'bg-white/[0.06] text-zinc-300 hover:text-white'
                     }`}
                   >
@@ -1598,7 +1598,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <select
                   value={savedBackgroundId}
                   onChange={(e) => setSavedBackgroundId(e.target.value)}
-                  className="flex-1 bg-black/50 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                  className="flex-1 bg-black/50 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
                 >
                   {savedBackgrounds.map((b) => (
                     <option key={b.id} value={b.id} className="bg-[#0e111a]">
@@ -1616,7 +1616,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   value={typedBackgroundText}
                   onChange={(e) => setTypedBackgroundText(e.target.value)}
                   placeholder="Type custom background & environment description..."
-                  className="w-full bg-black/50 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-2 text-xs text-white outline-none"
+                  className="w-full bg-black/50 border border-white/15 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-white outline-none"
                 />
               </div>
             )}
@@ -1643,7 +1643,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   onClick={() => handleSwitchChange('lighting', opt.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     switches.lighting === opt.id
-                      ? 'bg-[#f5c518] text-black font-bold'
+                      ? 'bg-cyan-400 text-slate-950 font-bold'
                       : 'bg-white/[0.06] text-zinc-300 hover:text-white'
                   }`}
                 >
@@ -1677,7 +1677,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   onClick={() => handleSwitchChange('ornaments', opt.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     switches.ornaments === opt.id
-                      ? 'bg-[#f5c518] text-black font-bold'
+                      ? 'bg-cyan-400 text-slate-950 font-bold'
                       : 'bg-white/[0.06] text-zinc-300 hover:text-white'
                   }`}
                 >
@@ -1692,7 +1692,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
         <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-white flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#f5c518]" />
+              <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
               <span>Optional Text Anchors (Off by default · Inserts - TEXT ANCHOR: ...)</span>
             </span>
             {anchorStatusNotice && (
@@ -1711,7 +1711,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   onChange={(e) =>
                     setAnchors((prev) => ({ ...prev, faceOutfitEnabled: e.target.checked }))
                   }
-                  className="accent-[#f5c518]"
+                  className="accent-cyan-400"
                 />
               </label>
               <input
@@ -1735,7 +1735,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   onChange={(e) =>
                     setAnchors((prev) => ({ ...prev, faceLightingEnabled: e.target.checked }))
                   }
-                  className="accent-[#f5c518]"
+                  className="accent-cyan-400"
                 />
               </label>
               <input
@@ -1759,7 +1759,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                   onChange={(e) =>
                     setAnchors((prev) => ({ ...prev, mannequinBuildEnabled: e.target.checked }))
                   }
-                  className="accent-[#f5c518]"
+                  className="accent-cyan-400"
                 />
               </label>
               <input
@@ -1778,7 +1778,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
         {/* Locked Invariant Rules + Live "Images needed" Bar */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-1">
           <div className="lg:col-span-7 p-3 rounded-xl bg-white/[0.02] border border-white/10 text-[11px] text-zinc-300 flex items-start gap-2.5">
-            <Lock className="w-4 h-4 text-[#f5c518] shrink-0 mt-0.5" />
+            <Lock className="w-4 h-4 text-cyan-300 shrink-0 mt-0.5" />
             <div>
               <strong className="text-white">Locked Rules (Always Enforced):</strong> Pose, hand/leg
               gestures, gaze direction, camera angle, framing, crop, ratio, and subject positions
@@ -1788,8 +1788,8 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
             </div>
           </div>
 
-          <div className="lg:col-span-5 p-3 rounded-xl bg-[#f5c518]/10 border border-[#f5c518]/30 flex items-center justify-between gap-2">
-            <span className="text-xs font-bold text-[#f5c518] shrink-0">Images needed:</span>
+          <div className="lg:col-span-5 p-3 rounded-xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-cyan-300 shrink-0">Images needed:</span>
             <div className="flex flex-wrap items-center gap-1.5">
               {imagesNeeded.map((slot, idx) => (
                 <span
@@ -1844,7 +1844,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => handleApplyConflictFix(item)}
-                  className="min-h-[38px] px-3 py-1.5 rounded-lg bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs shrink-0 flex items-center gap-1.5 transition cursor-pointer"
+                  className="min-h-[38px] px-3 py-1.5 rounded-lg studio-cta-primary font-bold text-xs shrink-0 flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Wrench className="w-3.5 h-3.5" />
                   <span>{item.fixLabel}</span>
@@ -1865,7 +1865,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
           <div>
             <h3 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <ClipboardCheck className="w-4 h-4 text-[#f5c518]" />
+              <ClipboardCheck className="w-4 h-4 text-cyan-300" />
               <span>Deterministic Swap Prompt Output</span>
             </h3>
             <p className="text-xs text-zinc-400">
@@ -1882,14 +1882,14 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
               value={projectTitle}
               onChange={(e) => setProjectTitle(e.target.value)}
               placeholder="Project title..."
-              className="bg-black/40 border border-white/15 focus:border-[#f5c518] rounded-xl px-3 py-1.5 text-xs text-white outline-none w-40 sm:w-48"
+              className="bg-black/40 border border-white/15 focus:border-cyan-400 rounded-xl px-3 py-1.5 text-xs text-white outline-none w-40 sm:w-48"
             />
             <button
               type="button"
               onClick={handleSaveAsProject}
               className="px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold text-xs border border-white/15 flex items-center gap-1.5 transition cursor-pointer"
             >
-              <BookmarkPlus className="w-3.5 h-3.5 text-[#f5c518]" />
+              <BookmarkPlus className="w-3.5 h-3.5 text-cyan-300" />
               <span>Save as project</span>
             </button>
             {onOpenProjects && (
@@ -1914,7 +1914,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
         {/* "Images needed, in this order" Cheat Sheet */}
         <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-2">
           <div className="text-xs font-bold text-white flex items-center gap-1.5">
-            <Info className="w-3.5 h-3.5 text-[#f5c518]" />
+            <Info className="w-3.5 h-3.5 text-cyan-300" />
             <span>Images needed, in this order (attach alongside the prompt):</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
@@ -1948,7 +1948,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
           readOnly
           value={finalPrompt}
           rows={18}
-          className="w-full glass-panel text-white p-4 rounded-2xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-[#f5c518] selection:text-black shadow-inner resize-y min-h-[280px]"
+          className="w-full glass-panel text-white p-4 rounded-2xl text-xs font-mono leading-relaxed outline-none select-text selection:bg-cyan-400 selection:text-slate-950 shadow-inner resize-y min-h-[280px]"
         />
 
         {/* Primary Copy Button */}
@@ -1957,16 +1957,16 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
             type="button"
             disabled={isCopyBlocked}
             onClick={handleCopyPrompt}
-            className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-[#ffe169] via-[#f5c518] to-[#d49a00] hover:brightness-105 text-black font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="flex-1 py-3.5 px-6 rounded-xl studio-cta-primary font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             {copySuccess ? (
               <>
-                <Check className="w-4 h-4 text-black stroke-[2.5]" />
+                <Check className="w-4 h-4 stroke-[2.5]" />
                 <span>Copied Swap Prompt!</span>
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4 text-black stroke-[2.5]" />
+                <Copy className="w-4 h-4 stroke-[2.5]" />
                 <span>
                   {isCopyBlocked
                     ? 'Upload Required Template & Face Images to Copy'
@@ -1981,7 +1981,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
         <div className="pt-3 border-t border-white/[0.08] space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-[#f5c518]" />
+              <BarChart3 className="w-4 h-4 text-cyan-300" />
               <span className="font-display text-xs sm:text-sm font-bold text-white">
                 Result Log · Tag Run Outcome for &ldquo;{activeRecipe.name}&rdquo;
               </span>
@@ -1992,7 +1992,7 @@ export const SwapStudio: React.FC<SwapStudioProps> = ({
           </div>
 
           {showPostCopyTagBar && (
-            <div className="text-xs text-[#f5c518] font-medium">
+            <div className="text-xs text-cyan-300 font-medium">
               Prompt copied! After generating your image, tap a result tag below to track how this recipe performed:
             </div>
           )}

@@ -107,7 +107,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 studio-panel p-5 rounded-2xl">
         <div>
           <div className="flex items-center gap-2">
-            <FolderKanban className="w-5 h-5 text-[#f5c518]" />
+            <FolderKanban className="w-5 h-5 text-cyan-300" />
             <h2 className="font-display text-base font-bold text-white tracking-tight">
               Saved Projects &amp; Blueprints
             </h2>
@@ -125,7 +125,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search projects..."
-              className="w-full min-h-[40px] bg-black/40 border border-white/15 focus:border-[#f5c518] text-white pl-8 pr-3 py-1.5 rounded-xl text-xs outline-none"
+              className="w-full min-h-[40px] bg-black/40 border border-white/15 focus:border-cyan-400 text-white pl-8 pr-3 py-1.5 rounded-xl text-xs outline-none"
             />
           </div>
         )}
@@ -158,7 +158,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
               <div
                 key={b.id}
                 onClick={() => onLoadBlueprint(b)}
-                className="group rounded-2xl studio-card hover:border-[#f5c518]/45 p-5 transition-all cursor-pointer flex flex-col justify-between"
+                className="group rounded-2xl studio-card hover:border-cyan-400/45 p-5 transition-all cursor-pointer flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
@@ -172,13 +172,13 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
                             type="text"
                             value={renameText}
                             onChange={(e) => setRenameText(e.target.value)}
-                            className="bg-black/60 border border-[#f5c518] rounded-lg px-2.5 py-1 text-xs text-white outline-none w-full"
+                            className="bg-black/60 border border-cyan-400 rounded-lg px-2.5 py-1 text-xs text-white outline-none w-full"
                             autoFocus
                           />
                           <button
                             type="button"
                             onClick={(e) => handleConfirmRename(b.id, e)}
-                            className="p-1.5 rounded-lg bg-[#f5c518] text-black font-bold text-xs"
+                            className="p-1.5 rounded-lg bg-cyan-400 text-slate-950 font-bold text-xs cursor-pointer"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
@@ -194,13 +194,13 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
                           </button>
                         </div>
                       ) : (
-                        <h3 className="font-display text-sm font-bold text-white group-hover:text-[#f5c518] transition truncate">
+                        <h3 className="font-display text-sm font-bold text-white group-hover:text-cyan-300 transition truncate">
                           {b.title}
                         </h3>
                       )}
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] font-mono text-zinc-400 tabular-nums">
-                        <span className="text-[#f5c518] font-medium">{toolLabel}</span>
+                        <span className="text-cyan-300 font-medium">{toolLabel}</span>
                         <span aria-hidden="true">·</span>
                         <span>
                           {new Date(b.updatedAt || b.createdAt).toLocaleDateString()}
@@ -236,7 +236,7 @@ export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlue
                   <button
                     type="button"
                     onClick={() => onLoadBlueprint(b)}
-                    className="flex items-center gap-1.5 text-[#f5c518] hover:text-[#ffe169] font-bold text-xs"
+                    className="flex items-center gap-1.5 text-cyan-300 hover:text-cyan-200 font-bold text-xs cursor-pointer"
                   >
                     <span>Open Project</span>
                     <ExternalLink className="w-3.5 h-3.5" />

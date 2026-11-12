@@ -31,7 +31,7 @@ export const WaitlistModal: React.FC<WaitlistModalProps> = ({ isOpen, onClose })
       <div className="w-full max-w-md rounded-2xl bg-[#11131a] border border-[#262a36] p-6 shadow-2xl text-left space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#f5c518]/20 text-[#f5c518] flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-cyan-400/20 text-cyan-300 flex items-center justify-center font-bold">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
@@ -54,16 +54,16 @@ export const WaitlistModal: React.FC<WaitlistModalProps> = ({ isOpen, onClose })
           </p>
           <ul className="space-y-1.5 pl-2 text-zinc-400">
             <li className="flex items-center gap-2">
-              <span className="text-[#f5c518]">✓</span> Batch multi-pose reference pipelines
+              <span className="text-cyan-300">✓</span> Batch multi-pose reference pipelines
             </li>
             <li className="flex items-center gap-2">
-              <span className="text-[#f5c518]">✓</span> Multi-character reference harmonization
+              <span className="text-cyan-300">✓</span> Multi-character reference harmonization
             </li>
             <li className="flex items-center gap-2">
-              <span className="text-[#f5c518]">✓</span> Integrated direct image generation in V2
+              <span className="text-cyan-300">✓</span> Integrated direct image generation in V2
             </li>
             <li className="flex items-center gap-2">
-              <span className="text-[#f5c518]">✓</span> Cloud team blueprint sync & version history
+              <span className="text-cyan-300">✓</span> Cloud team blueprint sync & version history
             </li>
           </ul>
         </div>
@@ -83,11 +83,11 @@ export const WaitlistModal: React.FC<WaitlistModalProps> = ({ isOpen, onClose })
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@example.com"
-              className="w-full bg-[#181b24] border border-[#262a36] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+              className="w-full bg-[#181b24] border border-[#262a36] focus:border-cyan-400 text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
             />
             <button
               type="submit"
-              className="w-full py-2.5 bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs"
+              className="w-full py-2.5 studio-cta-primary font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
             >
               <span>Request Early Access</span>
               <ArrowRight className="w-3.5 h-3.5" />

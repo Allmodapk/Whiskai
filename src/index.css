@@ -6,25 +6,29 @@
     --sar: env(safe-area-inset-right);
     --sab: env(safe-area-inset-bottom);
     --sal: env(safe-area-inset-left);
-    --canvas: #07090e;
-    --surface: #0e1118;
-    --surface-elevated: #141822;
+    --canvas: #06080f;
+    --surface: #0d111a;
+    --surface-elevated: #131926;
     --border-hairline: rgba(255, 255, 255, 0.085);
-    --accent: #f5c518;
+    --accent-cyan: #22d3ee;
+    --accent-violet: #8b5cf6;
   }
 
-  html,
+  html {
+    background-color: #06080f;
+    color-scheme: dark;
+    height: auto;
+    overflow-y: auto;
+  }
+
   body {
-    background-color: #07090e;
-    background-image:
-      radial-gradient(circle at 12% 0%, rgba(245, 197, 24, 0.045) 0%, transparent 42%),
-      radial-gradient(circle at 88% 12%, rgba(56, 189, 248, 0.03) 0%, transparent 40%);
-    background-attachment: fixed;
+    background-color: #06080f;
     color: #f3f4f8;
     font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    overscroll-behavior-y: none;
-    overflow-x: hidden;
+    overflow-x: clip;
+    min-height: 100dvh;
+    height: auto;
     letter-spacing: 0.005em;
   }
 
@@ -50,37 +54,63 @@
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid #f5c518;
+    outline: 2px solid #22d3ee;
     outline-offset: 2px;
   }
 }
 
-/* Unified Whiskai Creative Studio Surfaces */
+/* Unified Whiskai Obsidian + Cyan/Violet Studio Surfaces */
 .glass-panel,
 .studio-panel {
-  background: #0e1118;
+  background: #0d111a;
   border: 1px solid rgba(255, 255, 255, 0.085);
-  box-shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 18px 42px -22px rgba(0, 0, 0, 0.85), inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
 }
 
 .glass-card,
 .studio-card {
-  background: #121620;
+  background: #111622;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.025);
 }
 
 .glass-card-active,
 .studio-card-active {
-  background: #171c29;
-  border: 1px solid rgba(245, 197, 24, 0.55);
-  box-shadow: 0 10px 28px -12px rgba(245, 197, 24, 0.16);
+  background: linear-gradient(145deg, rgba(21, 29, 46, 0.98) 0%, rgba(17, 22, 36, 0.98) 100%);
+  border: 1px solid rgba(34, 211, 238, 0.5);
+  box-shadow: 0 12px 32px -14px rgba(34, 211, 238, 0.22);
+}
+
+.studio-card-featured {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(17, 22, 34, 0.98) 58%, rgba(34, 211, 238, 0.07) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.42);
+  box-shadow: 0 14px 36px -16px rgba(139, 92, 246, 0.28);
 }
 
 .glass-dock,
 .studio-dock {
-  background: rgba(14, 17, 24, 0.96);
+  background: rgba(11, 15, 24, 0.96);
+  backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.88);
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.9);
+}
+
+.studio-aurora-hero {
+  background:
+    radial-gradient(68% 95% at 92% 8%, rgba(34, 211, 238, 0.2) 0%, rgba(139, 92, 246, 0.16) 42%, transparent 74%),
+    radial-gradient(50% 65% at 8% 0%, rgba(139, 92, 246, 0.09) 0%, transparent 65%),
+    #0b0f18;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.studio-cta-primary {
+  background: linear-gradient(95deg, #22d3ee 0%, #38bdf8 48%, #818cf8 100%);
+  color: #040914;
+  box-shadow: 0 10px 26px -10px rgba(34, 211, 238, 0.55);
+}
+
+.studio-cta-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
 }
 
 /* Hide scrollbars inside horizontal mobile preset strips while preserving scroll */
@@ -92,10 +122,16 @@
   scrollbar-width: none;
 }
 
-/* Touch-friendly range sliders for mobile & desktop precision */
+/* Touch-friendly range sliders with crisp cyan/violet track clarity */
 input[type="range"] {
   height: 28px;
   background: transparent;
+  accent-color: #22d3ee;
+  touch-action: pan-y;
+}
+
+input[type="range"].slider-violet {
+  accent-color: #8b5cf6;
 }
 
 /* Custom scrollbar for desktop panels */
@@ -105,7 +141,7 @@ input[type="range"] {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(10, 12, 18, 0.85);
+  background: rgba(8, 11, 18, 0.85);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -114,12 +150,12 @@ input[type="range"] {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(245, 197, 24, 0.5);
+  background: rgba(34, 211, 238, 0.5);
 }
 
 /* Mobile notch safe utilities */
 .pb-safe {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.25rem);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
 }
 
 .pb-safe-nav {

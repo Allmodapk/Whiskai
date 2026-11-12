@@ -644,7 +644,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <button
                 type="button"
                 onClick={handleOpenCreateSubject}
-                className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-[40px] px-4 py-2 studio-cta-primary text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Subject Profile</span>
@@ -654,7 +654,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <button
                 type="button"
                 onClick={handleOpenCreateOutfit}
-                className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-[40px] px-4 py-2 studio-cta-primary text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Outfit Profile</span>
@@ -664,7 +664,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <button
                 type="button"
                 onClick={handleOpenCreateBg}
-                className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-[40px] px-4 py-2 studio-cta-primary text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Background Profile</span>
@@ -674,7 +674,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <button
                 type="button"
                 onClick={handleOpenCreateComp}
-                className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-[40px] px-4 py-2 studio-cta-primary text-xs font-bold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Component Preset</span>
@@ -714,11 +714,11 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
-                      <h3 className="font-display text-sm font-bold text-white group-hover:text-[#f5c518] transition truncate">
+                      <h3 className="font-display text-sm font-bold text-white group-hover:text-cyan-300 transition truncate">
                         {p.name}
                       </h3>
                       <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-0.5">
-                        <span className={isActive ? 'text-[#f5c518] font-medium' : ''}>
+                        <span className={isActive ? 'text-cyan-300 font-medium' : ''}>
                           {isActive ? 'Default Active Subject' : 'Click to set default'}
                         </span>
                         {(p.tags || []).length > 0 && (
@@ -813,7 +813,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
-                      <h3 className="font-display text-sm font-bold text-white group-hover:text-[#f5c518] transition truncate">
+                      <h3 className="font-display text-sm font-bold text-white group-hover:text-cyan-300 transition truncate">
                         {o.name}
                       </h3>
                       <div className="text-[11px] text-zinc-500 mt-0.5 truncate">
@@ -982,7 +982,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               onClick={() => setComponentFilter('all')}
               className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap shrink-0 cursor-pointer ${
                 componentFilter === 'all'
-                  ? 'bg-[#f5c518] text-black font-bold'
+                  ? 'bg-cyan-400 text-slate-950 font-bold'
                   : 'bg-[#121620] text-zinc-400 hover:text-white border border-white/[0.08]'
               }`}
             >
@@ -995,7 +995,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 onClick={() => setComponentFilter(key)}
                 className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap shrink-0 cursor-pointer ${
                   componentFilter === key
-                    ? 'bg-[#f5c518] text-black font-bold'
+                    ? 'bg-cyan-400 text-slate-950 font-bold'
                     : 'bg-[#121620] text-zinc-400 hover:text-white border border-white/[0.08]'
                 }`}
               >
@@ -1013,7 +1013,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 <div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-display text-sm font-bold text-white">{item.name}</span>
-                    <span className="text-[11px] text-[#f5c518] font-medium">
+                    <span className="text-[11px] text-cyan-300 font-medium">
                       {COMPONENT_LABELS[item.componentKey as ComponentKey] ||
                         CAMERA_COMPONENT_LABELS[item.componentKey as CameraComponentKey]?.label ||
                         item.componentKey}
@@ -1068,7 +1068,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             <button
               type="button"
               onClick={handleSaveSubject}
-              className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl cursor-pointer"
+              className="min-h-[40px] px-4 py-2 studio-cta-primary text-xs font-bold rounded-xl cursor-pointer"
             >
               Save Subject Profile
             </button>
@@ -1093,7 +1093,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 <button
                   type="button"
                   onClick={() => subjectFileInputRef.current?.click()}
-                  className="min-h-[34px] text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
+                  className="min-h-[34px] text-xs font-bold text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Upload Photos (Max 5)</span>
@@ -1132,7 +1132,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 type="button"
                 disabled={isAnalyzingSubject}
                 onClick={handleAnalyzeSubjectImages}
-                className="w-full min-h-[40px] py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
+                className="w-full min-h-[40px] py-2.5 rounded-xl studio-cta-primary font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
               >
                 {isAnalyzingSubject ? (
                   <>
@@ -1161,7 +1161,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   value={subjectName}
                   onChange={(e) => setSubjectName(e.target.value)}
                   placeholder="e.g. Studio Identity A"
-                  className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+                  className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
                 />
               </div>
               <div>
@@ -1173,7 +1173,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   value={subjectTags}
                   onChange={(e) => setSubjectTags(e.target.value)}
                   placeholder="e.g. Portrait, Realistic"
-                  className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+                  className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
                 />
               </div>
             </div>
@@ -1186,7 +1186,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={subjectText}
                 onChange={(e) => setSubjectText(e.target.value)}
                 rows={4}
-                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
                 placeholder="Apparent age range, skin tone, facial structure, eyes, eyebrows, nose, lips, hair texture, and distinguishing marks..."
               />
             </div>
@@ -1199,7 +1199,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={bodyText}
                 onChange={(e) => setBodyText(e.target.value)}
                 rows={3}
-                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
                 placeholder="Body proportions, silhouette, build, and anatomical geometry..."
               />
             </div>
@@ -1226,7 +1226,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             <button
               type="button"
               onClick={handleSaveOutfit}
-              className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl cursor-pointer"
+              className="min-h-[40px] px-4 py-2 studio-cta-primary text-xs font-bold rounded-xl cursor-pointer"
             >
               Save Outfit Profile
             </button>
@@ -1247,7 +1247,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <button
                 type="button"
                 onClick={() => outfitFileInputRef.current?.click()}
-                className="min-h-[34px] text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
+                className="min-h-[34px] text-xs font-bold text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>{outfitImage ? 'Change Image' : 'Upload Outfit Image'}</span>
@@ -1265,7 +1265,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   type="button"
                   disabled={isAnalyzingOutfit}
                   onClick={handleAnalyzeOutfitImage}
-                  className="flex-1 min-h-[40px] py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
+                  className="flex-1 min-h-[40px] py-2.5 px-4 rounded-xl studio-cta-primary font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
                 >
                   {isAnalyzingOutfit ? (
                     <>
@@ -1293,7 +1293,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={outfitName}
                 onChange={(e) => setOutfitName(e.target.value)}
                 placeholder="e.g. Tailored Linen Blazer & Silk Camisole"
-                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
               />
             </div>
 
@@ -1303,28 +1303,28 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={outfitGarment}
                 onChange={(e) => setOutfitGarment(e.target.value)}
                 placeholder="Garment categories"
-                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400"
               />
               <input
                 type="text"
                 value={outfitColors}
                 onChange={(e) => setOutfitColors(e.target.value)}
                 placeholder="Colors & patterns"
-                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400"
               />
               <input
                 type="text"
                 value={outfitMaterials}
                 onChange={(e) => setOutfitMaterials(e.target.value)}
                 placeholder="Fabrics & textures"
-                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400"
               />
               <input
                 type="text"
                 value={outfitFit}
                 onChange={(e) => setOutfitFit(e.target.value)}
                 placeholder="Fit, drape & construction"
-                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#f5c518]"
+                className="bg-[#121620] border border-white/[0.1] rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-400"
               />
             </div>
 
@@ -1336,7 +1336,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={outfitDesc}
                 onChange={(e) => setOutfitDesc(e.target.value)}
                 rows={4}
-                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
                 placeholder="Detailed description of visible garments, colors, fabrics, fit, neckline, sleeves, hems, accessories, and footwear..."
               />
             </div>
@@ -1363,7 +1363,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             <button
               type="button"
               onClick={handleSaveBg}
-              className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl cursor-pointer"
+              className="min-h-[40px] px-4 py-2 studio-cta-primary text-xs font-bold rounded-xl cursor-pointer"
             >
               Save Background Profile
             </button>
@@ -1384,7 +1384,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <button
                 type="button"
                 onClick={() => bgFileInputRef.current?.click()}
-                className="min-h-[34px] text-xs font-bold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
+                className="min-h-[34px] text-xs font-bold text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>{bgImage ? 'Change Image' : 'Upload Scene Image'}</span>
@@ -1402,7 +1402,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                   type="button"
                   disabled={isAnalyzingBg}
                   onClick={handleAnalyzeBgImage}
-                  className="flex-1 min-h-[40px] py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
+                  className="flex-1 min-h-[40px] py-2.5 px-4 rounded-xl studio-cta-primary font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
                 >
                   {isAnalyzingBg ? (
                     <>
@@ -1428,7 +1428,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={bgName}
                 onChange={(e) => setBgName(e.target.value)}
                 placeholder="e.g. Sunlit Concrete Studio Loft"
-                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
               />
             </div>
 
@@ -1440,7 +1440,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={bgDesc}
                 onChange={(e) => setBgDesc(e.target.value)}
                 rows={3}
-                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
                 placeholder="Describe visible background structures, surfaces, colors, textures, and depth..."
               />
             </div>
@@ -1453,7 +1453,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={bgEnvironment}
                 onChange={(e) => setBgEnvironment(e.target.value)}
                 rows={3}
-                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
                 placeholder="Describe indoor/outdoor setting, architectural context, atmosphere, or weather conditions..."
               />
             </div>
@@ -1466,7 +1466,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
                 value={bgLighting}
                 onChange={(e) => setBgLighting(e.target.value)}
                 rows={3}
-                className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+                className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
                 placeholder="Describe apparent light sources, direction, softness, color temperature, highlights, and shadows..."
               />
             </div>
@@ -1492,7 +1492,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             <button
               type="button"
               onClick={handleSaveComp}
-              className="min-h-[40px] px-4 py-2 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold rounded-xl cursor-pointer"
+              className="min-h-[40px] px-4 py-2 studio-cta-primary text-xs font-bold rounded-xl cursor-pointer"
             >
               Save Component Preset
             </button>
@@ -1507,7 +1507,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
             <select
               value={compKey}
               onChange={(e) => setCompKey(e.target.value as ComponentKey)}
-              className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+              className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
             >
               {ALL_COMPONENT_KEYS.map((k) => (
                 <option key={k} value={k} className="bg-[#0e1118] text-white">
@@ -1526,7 +1526,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               value={compName}
               onChange={(e) => setCompName(e.target.value)}
               placeholder="e.g. Low-Angle Three-Quarter Perspective"
-              className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
+              className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white px-3.5 py-2.5 rounded-xl text-xs outline-none"
             />
           </div>
 
@@ -1538,7 +1538,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               value={compDesc}
               onChange={(e) => setCompDesc(e.target.value)}
               rows={4}
-              className="w-full bg-[#121620] border border-white/[0.1] focus:border-[#f5c518] text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
+              className="w-full bg-[#121620] border border-white/[0.1] focus:border-cyan-400 text-white p-3 rounded-xl text-xs leading-relaxed outline-none"
               placeholder="Detailed description for this reusable component..."
             />
           </div>

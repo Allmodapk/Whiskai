@@ -50,6 +50,7 @@ import {
   GeneralExtractorWorkspace,
   type SceneAccordionGroup,
 } from './components/GeneralExtractorWorkspace';
+import { KeyModal } from './components/KeyModal';
 import { BottomSheet } from './components/ui/StudioPrimitives';
 import {
   Wrench,
@@ -64,11 +65,16 @@ import {
   ExternalLink,
   ArrowLeft,
   AlertTriangle,
-  X,
   ListChecks,
   Compass,
   ArrowRight,
   Layers,
+  Home,
+  LayoutGrid,
+  Menu,
+  KeyRound,
+  Box,
+  Play,
 } from 'lucide-react';
 
 function checkIsCameraRoute(): { isCameraRoute: boolean; mode: 'playboard' | 'extractor' } {
@@ -161,6 +167,11 @@ export default function App() {
   // Main Navigation: Tools | Profiles | Projects & Hub vs Workspace state
   const [activeNav, setActiveNav] = useState<'tools' | 'profiles' | 'projects'>('tools');
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState<boolean>(false);
+  const [hubCategory, setHubCategory] = useState<'all' | 'analysis' | 'editing' | 'camera'>('all');
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState<boolean>(false);
+  const [hasServerKey, setHasServerKey] = useState<boolean>(true);
+  const [customKeyTick, setCustomKeyTick] = useState<number>(0);
 
   // Active Tool inside Main Tools page:
   const [activeTool, setActiveTool] = useState<ToolType>(() => {
@@ -288,6 +299,25 @@ export default function App() {
       window.removeEventListener('hashchange', syncRoute);
     };
   }, []);
+
+  // Check API server health flag once
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((d) => {
+        if (typeof d?.hasServerKey === 'boolean') {
+          setHasServerKey(d.hasServerKey);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Reset vertical scroll position cleanly on view/tool switch
+  useEffect(() => {
+    if (!isDedicatedCameraView) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [activeNav, isWorkspaceOpen, activeTool, isDedicatedCameraView]);
 
   // Final Prompt Generation state
   const [generatedMasterPrompt, setGeneratedMasterPrompt] = useState<string | null>(null);
@@ -1720,8 +1750,87 @@ export default function App() {
       )
     : { locked: 0, edited: 0, ignored: 0, unavailable: 0 };
 
+  const profileCount = StorageService.getProfiles().length;
+  const projectCount = StorageService.getBlueprints().length;
+  const hasCustomKey = Boolean(StorageService.getCustomApiKey()) && customKeyTick >= 0;
+
+  const ACTIVE_TOOL_TITLE: Record<string, string> = {
+    general_extractor: 'General Prompt Extractor',
+    subject_swapping: 'Swap Studio',
+    perspective_playboard: '3D Perspective Playboard',
+    camera_ai: 'Camera AI',
+    camera_controller: 'Camera Angle Controller',
+  };
+
+  const HUB_TOOLS = [
+    {
+      id: 'general_extractor' as const,
+      index: '01',
+      category: 'analysis' as const,
+      tag: '13-Component Extraction',
+      title: 'General Prompt Extractor',
+      desc: 'Analyze a single image into detailed, editable visual components and build a grounded structured prompt.',
+      icon: Layers,
+      accent: 'cyan' as const,
+    },
+    {
+      id: 'subject_swapping' as const,
+      index: '02',
+      category: 'editing' as const,
+      tag: 'Identity Transfer',
+      title: 'Swap Studio',
+      desc: 'Swap subjects, outfits, or scene elements using modular multi-image controls and locked recipes.',
+      icon: UserCheck,
+      accent: 'violet' as const,
+    },
+    {
+      id: 'camera_ai' as const,
+      index: '03',
+      category: 'camera' as const,
+      tag: 'Optical Re-Shoot',
+      title: 'Camera AI',
+      desc: 'Extract camera position and lens framing from any template photo, then re-shoot your own image from that setup.',
+      icon: Camera,
+      accent: 'cyan' as const,
+    },
+    {
+      id: 'perspective_playboard' as const,
+      index: '04',
+      category: 'camera' as const,
+      tag: 'Interactive 3D Stage',
+      title: '3D Perspective Playboard',
+      desc: 'Orbit a virtual camera around a fixed 3D reference subject, lock the frame, and generate a precise camera prompt.',
+      icon: Box,
+      accent: 'featured' as const,
+    },
+    {
+      id: 'camera_controller' as const,
+      index: '05',
+      category: 'camera' as const,
+      tag: 'Full-Screen Rig',
+      title: 'Camera Angle Controller',
+      desc: 'Dedicated full-screen 3D pose & camera rig workspace for multi-angle staging and reference camera breakdown.',
+      icon: Compass,
+      accent: 'cyan' as const,
+    },
+  ];
+
+  const filteredHubTools = HUB_TOOLS.filter((tool) => {
+    if (hubCategory === 'all') return true;
+    if (hubCategory === 'analysis') return tool.category === 'analysis' || tool.id === 'camera_ai';
+    if (hubCategory === 'editing') return tool.category === 'editing';
+    if (hubCategory === 'camera') return tool.category === 'camera';
+    return true;
+  });
+
   return (
-    <div className="min-h-screen text-[#f3f4f8] flex flex-col justify-between selection:bg-[#f5c518] selection:text-black">
+    <div
+      className={
+        isDedicatedCameraView
+          ? 'min-h-[100dvh] text-[#f3f4f8] flex flex-col selection:bg-cyan-400 selection:text-slate-950'
+          : 'min-h-[100dvh] w-full flex flex-col lg:flex-row bg-[#06080f] text-[#f3f4f8] overflow-x-clip selection:bg-cyan-400 selection:text-slate-950'
+      }
+    >
       {/* Hidden single image file input */}
       <input
         type="file"
@@ -1830,10 +1939,10 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* Compact 3-Zone Studio Top Bar */}
-          <header className="sticky top-0 z-40 h-14 bg-[#07090e]/95 border-b border-white/[0.08] px-4">
-            <div className="max-w-6xl mx-auto h-full flex items-center justify-between gap-6">
-              {/* Zone 1: Brand Wordmark */}
+          {/* DESKTOP STICKY LEFT SIDEBAR (Mirrors Image 1 Workspace Rail) */}
+          <aside className="hidden lg:flex lg:flex-col lg:w-64 xl:w-68 lg:shrink-0 lg:sticky lg:top-0 lg:h-[100dvh] bg-[#080b13] border-r border-white/[0.08] z-30">
+            {/* Brand Header */}
+            <div className="p-4 border-b border-white/[0.07]">
               <button
                 type="button"
                 onClick={() => {
@@ -1841,53 +1950,244 @@ export default function App() {
                   setActiveNav('tools');
                   setIsWorkspaceOpen(false);
                 }}
-                className="flex items-center gap-2.5 text-left cursor-pointer shrink-0 group"
+                className="flex items-center gap-3 text-left w-full group cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-lg bg-[#f5c518] flex items-center justify-center text-black shrink-0">
-                  <Sparkles className="w-4 h-4 stroke-[2.4]" />
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center text-slate-950 font-display font-black text-base shadow-[0_6px_18px_-6px_rgba(34,211,238,0.65)] shrink-0">
+                  W
                 </div>
-                <span className="font-display font-bold text-sm sm:text-base tracking-tight text-white whitespace-nowrap group-hover:text-[#f5c518] transition-colors">
-                  My Whisk <span className="text-[#f5c518]">AI</span>
-                </span>
+                <div className="min-w-0">
+                  <div className="font-display font-bold text-base tracking-tight text-white group-hover:text-cyan-300 transition-colors leading-tight">
+                    Whiskai
+                  </div>
+                  <div className="text-[11px] text-zinc-400 truncate">Creative AI Studio</div>
+                </div>
               </button>
+            </div>
 
-              {/* Zone 2: Concise Primary Navigation (Desktop) */}
-              <nav
-                aria-label="Primary studio sections"
-                className="hidden md:flex items-center gap-6"
+            {/* Primary Navigation Links */}
+            <nav aria-label="Primary studio navigation" className="p-3 space-y-1">
+              {(
+                [
+                  {
+                    id: 'home' as const,
+                    label: 'Home',
+                    icon: Home,
+                    active: activeNav === 'tools' && !isWorkspaceOpen,
+                    onClick: () => {
+                      triggerHaptic();
+                      setActiveNav('tools');
+                      setIsWorkspaceOpen(false);
+                    },
+                  },
+                  {
+                    id: 'tools' as const,
+                    label: 'Tools',
+                    icon: LayoutGrid,
+                    active: activeNav === 'tools' && isWorkspaceOpen,
+                    onClick: () => {
+                      triggerHaptic();
+                      setActiveNav('tools');
+                      setIsWorkspaceOpen(true);
+                    },
+                  },
+                  {
+                    id: 'projects' as const,
+                    label: 'Projects',
+                    count: projectCount,
+                    icon: FolderKanban,
+                    active: activeNav === 'projects',
+                    onClick: () => {
+                      triggerHaptic();
+                      setActiveNav('projects');
+                    },
+                  },
+                  {
+                    id: 'profiles' as const,
+                    label: 'Profiles',
+                    count: profileCount,
+                    icon: Users,
+                    active: activeNav === 'profiles',
+                    onClick: () => {
+                      triggerHaptic();
+                      setActiveNav('profiles');
+                    },
+                  },
+                ]
+              ).map((navItem) => {
+                const Icon = navItem.icon;
+                return (
+                  <button
+                    key={navItem.id}
+                    type="button"
+                    onClick={navItem.onClick}
+                    className={`w-full min-h-[40px] px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 transition cursor-pointer ${
+                      navItem.active
+                        ? 'bg-gradient-to-r from-cyan-400/18 to-violet-500/18 border border-cyan-400/40 text-cyan-200'
+                        : 'text-zinc-400 hover:text-white hover:bg-white/[0.04] border border-transparent'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <Icon
+                        className={`w-4 h-4 shrink-0 ${
+                          navItem.active ? 'text-cyan-300' : 'text-zinc-400'
+                        }`}
+                      />
+                      <span className="truncate">{navItem.label}</span>
+                    </span>
+                    {typeof navItem.count === 'number' && (
+                      <span className="font-mono text-[11px] text-zinc-500 tabular-nums">
+                        {navItem.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Quick Workspace Tools Rail (mirrors Image 1 Tools list) */}
+            <div className="flex-1 overflow-y-auto px-3 pb-3 pt-2 border-t border-white/[0.06] space-y-1.5">
+              <div className="px-2 pb-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                Studio Workspaces
+              </div>
+              {HUB_TOOLS.map((tool) => {
+                const Icon = tool.icon;
+                const isSelected =
+                  activeNav === 'tools' && isWorkspaceOpen && activeTool === tool.id;
+                return (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    onClick={() => handleSelectTool(tool.id)}
+                    className={`w-full px-3 py-2.5 rounded-xl text-left flex items-start gap-2.5 border transition cursor-pointer ${
+                      isSelected
+                        ? 'studio-card-featured text-white'
+                        : 'bg-white/[0.015] hover:bg-white/[0.05] border-white/[0.05] text-zinc-300 hover:text-white'
+                    }`}
+                  >
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                        isSelected
+                          ? 'bg-violet-500/25 text-violet-200 border border-violet-400/45'
+                          : 'bg-white/[0.04] text-cyan-300 border border-white/[0.08]'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold truncate">{tool.title}</div>
+                      <div className="text-[10px] text-zinc-500 truncate mt-0.5">{tool.tag}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Bottom Utility Controls: API Key Connection & PWA Install */}
+            <div className="p-3 border-t border-white/[0.07] space-y-2 bg-[#070a12]">
+              <PWAInstallButton variant="header" />
+              <button
+                type="button"
+                onClick={() => setIsKeyModalOpen(true)}
+                className="w-full min-h-[40px] px-3 py-2 rounded-xl bg-[#0e131e] hover:bg-[#141b2a] border border-white/[0.09] text-xs font-semibold text-zinc-200 flex items-center justify-between gap-2 transition cursor-pointer"
               >
-                {(
-                  [
-                    { id: 'tools', label: 'Studio Hub' },
-                    { id: 'profiles', label: 'Profiles' },
-                    { id: 'projects', label: 'Projects' },
-                  ] as const
-                ).map((item) => {
-                  const isActive = activeNav === item.id;
-                  return (
+                <span className="flex items-center gap-2 min-w-0">
+                  <KeyRound className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span className="truncate">API Key Setup</span>
+                </span>
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    hasServerKey || hasCustomKey ? 'bg-emerald-400' : 'bg-amber-400'
+                  }`}
+                />
+              </button>
+            </div>
+          </aside>
+
+          {/* MAIN WORKSPACE CONTENT COLUMN */}
+          <div className="flex-1 min-w-0 flex flex-col">
+            {/* Compact Top Header (Mobile Brand + Studio Badge | Desktop Breadcrumbs + Quick Key) */}
+            <header className="sticky top-0 z-30 h-14 bg-[#06080f]/95 backdrop-blur-md border-b border-white/[0.08] px-3.5 sm:px-6 flex items-center justify-between gap-3">
+              {/* Mobile Brand & Menu */}
+              <div className="flex items-center gap-2.5 lg:hidden min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileDrawerOpen(true)}
+                  aria-label="Open studio workspaces menu"
+                  className="w-9 h-9 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.09] flex items-center justify-center text-zinc-200 cursor-pointer shrink-0"
+                >
+                  <Menu className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    setActiveNav('tools');
+                    setIsWorkspaceOpen(false);
+                  }}
+                  className="flex items-center gap-2 text-left cursor-pointer min-w-0"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center text-slate-950 font-display font-black text-sm shrink-0">
+                    W
+                  </div>
+                  <span className="font-display font-bold text-base tracking-tight text-white truncate">
+                    Whiskai
+                  </span>
+                </button>
+
+                {activeNav === 'tools' && isWorkspaceOpen && (
+                  <span className="px-2 py-0.5 rounded-full border border-cyan-400/50 bg-cyan-400/10 text-cyan-300 text-[10px] font-semibold whitespace-nowrap shrink-0">
+                    Studio
+                  </span>
+                )}
+              </div>
+
+              {/* Desktop Breadcrumb Bar (Mirrors Image 1) */}
+              <div className="hidden lg:flex items-center gap-2 text-xs text-zinc-400 min-w-0">
+                {activeNav === 'tools' && isWorkspaceOpen ? (
+                  <>
                     <button
-                      key={item.id}
                       type="button"
                       onClick={() => {
                         triggerHaptic();
-                        setActiveNav(item.id);
-                        if (item.id === 'tools') setIsWorkspaceOpen(false);
+                        setIsWorkspaceOpen(false);
                       }}
-                      className={`relative py-1.5 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                        isActive ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
-                      }`}
+                      className="flex items-center gap-1.5 text-zinc-300 hover:text-cyan-300 font-semibold transition cursor-pointer"
                     >
-                      <span>{item.label}</span>
-                      {isActive && (
-                        <span className="absolute left-0 right-0 -bottom-[15px] h-0.5 bg-[#f5c518] rounded-full" />
-                      )}
+                      <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Tools</span>
                     </button>
-                  );
-                })}
-              </nav>
+                    <span className="text-zinc-600">/</span>
+                    <span className="font-semibold text-white truncate">
+                      {ACTIVE_TOOL_TITLE[activeTool] || 'Workspace'}
+                    </span>
+                  </>
+                ) : activeNav === 'projects' ? (
+                  <span className="font-semibold text-white">Projects &amp; Saved Blueprints</span>
+                ) : activeNav === 'profiles' ? (
+                  <span className="font-semibold text-white">Profiles &amp; Libraries</span>
+                ) : (
+                  <span className="font-semibold text-white">Studio Hub</span>
+                )}
+              </div>
 
-              {/* Zone 3: Single Primary Action */}
-              <div className="flex items-center shrink-0">
+              {/* Top Right Actions */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsKeyModalOpen(true)}
+                  title="API Key Connection"
+                  aria-label="API Key Connection"
+                  className="lg:hidden min-h-[36px] px-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.09] text-xs text-zinc-200 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      hasServerKey || hasCustomKey ? 'bg-emerald-400' : 'bg-amber-400'
+                    }`}
+                  />
+                </button>
+
                 {activeNav === 'tools' && isWorkspaceOpen ? (
                   <button
                     type="button"
@@ -1895,542 +2195,629 @@ export default function App() {
                       triggerHaptic();
                       setIsWorkspaceOpen(false);
                     }}
-                    className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-zinc-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                    className="min-h-[36px] px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-zinc-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5 text-[#f5c518]" />
-                    <span>Studio Hub</span>
+                    <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="hidden xs:inline">Studio Hub</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => handleSelectTool('perspective_playboard')}
-                    className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                    className="min-h-[36px] px-3.5 py-1.5 rounded-xl studio-cta-primary text-xs font-bold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
                   >
                     <Compass className="w-3.5 h-3.5" />
                     <span>3D Playboard</span>
                   </button>
                 )}
               </div>
-            </div>
-          </header>
+            </header>
 
-          {/* Main Container */}
-          <main
-            className={`flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-6 ${
-              !isWorkspaceOpen || activeNav !== 'tools' ? 'pb-24 md:pb-12' : 'pb-10'
-            }`}
-          >
-            {/* TAB 1: STUDIO HUB & DEDICATED WORKSPACES */}
-            {activeNav === 'tools' && !isWorkspaceOpen && (
-              <div className="space-y-6">
-                {/* Concise Studio Hub Hero */}
-                <section className="studio-panel rounded-2xl p-5 sm:p-7 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                  <div className="space-y-2 max-w-2xl">
-                    <div className="text-xs font-mono text-[#f5c518] tracking-wide">
-                      My Whisk AI · Prompt Engineering &amp; Camera Control Studio
+            {/* MAIN CONTENT */}
+            <main
+              className={`flex-1 w-full max-w-[1440px] mx-auto px-3.5 py-4 sm:p-6 space-y-6 ${
+                !isWorkspaceOpen || activeNav !== 'tools' ? 'pb-24 lg:pb-12' : 'pb-12'
+              }`}
+            >
+              {/* STUDIO HUB (Mirrors Image 2: Aurora Banner + Category Filter + Clean Icon Launch Cards) */}
+              {activeNav === 'tools' && !isWorkspaceOpen && (
+                <div className="space-y-5">
+                  <section className="studio-aurora-hero rounded-2xl p-5 sm:p-7 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                    <div className="space-y-2 max-w-2xl">
+                      <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight bg-gradient-to-r from-white via-cyan-100 to-violet-200 bg-clip-text text-transparent">
+                        Visual Analysis &amp; Prompt Engineering
+                      </h1>
+                      <p className="text-xs sm:text-sm text-zinc-300/90 leading-relaxed">
+                        Understand images, control visual changes, and design precise AI-ready prompts across five dedicated studio tools.
+                      </p>
                     </div>
-                    <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
-                      Structured Prompt &amp; Perspective Control
-                    </h1>
-                    <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                      Deconstruct reference photography into editable visual blueprints, swap subject identities, extract lens perspective, or frame virtual camera angles in 3D.
-                    </p>
-                  </div>
 
-                  <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-2.5 shrink-0">
-                    <PWAInstallButton variant="banner" />
-                    <div className="flex items-center gap-3 text-xs font-mono text-zinc-400">
-                      <span>{StorageService.getProfiles().length} Profiles</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{StorageService.getBlueprints().length} Saved Projects</span>
+                    <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-2.5 shrink-0">
+                      <PWAInstallButton variant="banner" />
+                      <div className="flex items-center gap-3 text-xs font-mono text-zinc-400 tabular-nums">
+                        <span>{profileCount} Profiles</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{projectCount} Projects</span>
+                      </div>
                     </div>
-                  </div>
-                </section>
+                  </section>
 
-                {/* 5 Specialized Tool Launch Cards */}
-                <section aria-label="Creative studio tools" className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-display text-sm font-bold text-white tracking-tight">
-                      Select a Workspace
-                    </h2>
-                    <span className="text-xs text-zinc-500">Tap any tool to open its workspace</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {/* Category Filter Pills Row */}
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5">
                     {(
                       [
-                        {
-                          id: 'general_extractor',
-                          index: '01',
-                          tag: '13-Component Extraction',
-                          title: 'General Prompt Extractor',
-                          desc: 'Analyze any image into 13 grounded visual fields, filter or edit details, merge saved profiles, and compile clean prompts.',
-                          icon: FileSearch,
-                        },
-                        {
-                          id: 'subject_swapping',
-                          index: '02',
-                          tag: 'Identity Transfer',
-                          title: 'Swap Studio',
-                          desc: 'Deterministic multi-image subject replacement using locked recipes, 4 slot controls, and Source Matrix switches.',
-                          icon: UserCheck,
-                        },
-                        {
-                          id: 'perspective_playboard',
-                          index: '03',
-                          tag: 'Interactive 3D Camera',
-                          title: '3D Perspective Playboard',
-                          desc: 'Orbit a virtual camera around a fixed 3D subject, lock framing and focal length, and compile a 9-section camera prompt.',
-                          icon: Compass,
-                        },
-                        {
-                          id: 'camera_ai',
-                          index: '04',
-                          tag: 'Optical Re-Shoot',
-                          title: 'Camera AI',
-                          desc: "Extract a template photo's elevation, azimuth, distance, and optics to re-shoot your own image from that camera angle.",
-                          icon: Sliders,
-                        },
-                        {
-                          id: 'camera_controller',
-                          index: '05',
-                          tag: 'Full-Screen Studio',
-                          title: 'Camera Angle Controller',
-                          desc: 'Dedicated full-screen 3D pose & camera rig workspace for multi-angle staging and reference camera breakdown.',
-                          icon: Camera,
-                        },
+                        { id: 'all', label: 'All Tools', icon: Wrench },
+                        { id: 'analysis', label: 'Analysis', icon: FileSearch },
+                        { id: 'editing', label: 'Editing', icon: Sliders },
+                        { id: 'camera', label: 'Camera', icon: Camera },
                       ] as const
-                    ).map((tool) => {
-                      const Icon = tool.icon;
-                      if (tool.id === 'camera_controller') {
-                        return (
-                          <div
-                            key={tool.id}
-                            className="studio-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 hover:border-[#f5c518]/45 transition-colors"
-                          >
-                            <div className="space-y-2.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-9 h-9 rounded-xl bg-[#f5c518]/12 border border-[#f5c518]/30 flex items-center justify-center text-[#f5c518] shrink-0">
-                                    <Icon className="w-4 h-4" />
-                                  </div>
-                                  <div>
-                                    <div className="text-[11px] font-mono text-zinc-400">
-                                      {tool.index} · {tool.tag}
-                                    </div>
-                                    <h3 className="font-display text-sm sm:text-base font-bold text-white">
-                                      {tool.title}
-                                    </h3>
-                                  </div>
-                                </div>
-                              </div>
-                              <p className="text-xs text-zinc-400 leading-relaxed">{tool.desc}</p>
-                            </div>
-
-                            <div className="flex items-center gap-2 pt-3 border-t border-white/[0.07]">
-                              <a
-                                href="/camera-controller"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={() => handleCameraNewTabLaunch('playboard')}
-                                className="flex-1 min-h-[42px] px-3.5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                              >
-                                <span>Launch New Tab</span>
-                                <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => openCameraInCurrentTab('playboard')}
-                                className="min-h-[42px] px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 border border-white/10 text-xs font-semibold transition cursor-pointer whitespace-nowrap"
-                              >
-                                Open Here
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      }
-
+                    ).map((cat) => {
+                      const CatIcon = cat.icon;
+                      const isActive = hubCategory === cat.id;
                       return (
                         <button
-                          key={tool.id}
+                          key={cat.id}
                           type="button"
-                          onClick={() => handleSelectTool(tool.id)}
-                          className="studio-card hover:border-[#f5c518]/50 hover:bg-[#151a26] rounded-2xl p-4 sm:p-5 text-left flex flex-col justify-between gap-4 transition-all cursor-pointer group"
-                        >
-                          <div className="space-y-2.5 w-full">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-9 h-9 rounded-xl bg-[#f5c518]/12 border border-[#f5c518]/30 flex items-center justify-center text-[#f5c518] shrink-0 group-hover:bg-[#f5c518] group-hover:text-black transition-colors">
-                                  <Icon className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="text-[11px] font-mono text-zinc-400 truncate">
-                                    {tool.index} · {tool.tag}
-                                  </div>
-                                  <h3 className="font-display text-sm sm:text-base font-bold text-white group-hover:text-[#f5c518] transition-colors truncate">
-                                    {tool.title}
-                                  </h3>
-                                </div>
-                              </div>
-                            </div>
-                            <p className="text-xs text-zinc-400 leading-relaxed">{tool.desc}</p>
-                          </div>
-
-                          <div className="w-full pt-3 border-t border-white/[0.07] flex items-center justify-between text-xs font-semibold text-zinc-300 group-hover:text-[#f5c518] transition-colors">
-                            <span>Open Workspace</span>
-                            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Graceful Popup Restriction Fallback Banner */}
-                  {popupFallbackBanner && (
-                    <div className="p-3.5 rounded-xl bg-[#111726] border border-[#f5c518]/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="text-xs text-zinc-200">
-                        <span className="font-bold text-white">
-                          Camera Angle Controller launched in a new tab.
-                        </span>{' '}
-                        If popups are blocked on mobile, open it directly in this tab:
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => openCameraInCurrentTab('playboard')}
-                          className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold transition cursor-pointer"
-                        >
-                          Open in Current Tab
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPopupFallbackBanner(false)}
-                          className="min-h-[38px] px-2.5 py-1.5 rounded-xl text-xs text-zinc-400 hover:text-white cursor-pointer"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </section>
-
-                {/* Recent Saved Projects Quick Resume */}
-                {(() => {
-                  const recentBlueprints = StorageService.getBlueprints().slice(0, 3);
-                  if (recentBlueprints.length === 0) return null;
-                  return (
-                    <section aria-label="Recent saved projects" className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h2 className="font-display text-sm font-bold text-white tracking-tight">
-                          Recent Projects
-                        </h2>
-                        <button
-                          type="button"
-                          onClick={() => setActiveNav('projects')}
-                          className="text-xs font-semibold text-[#f5c518] hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>View All</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {recentBlueprints.map((bp) => (
-                          <button
-                            key={bp.id}
-                            type="button"
-                            onClick={() => handleLoadBlueprint(bp)}
-                            className="studio-card hover:border-[#f5c518]/45 rounded-2xl p-3.5 text-left flex items-center gap-3 transition-colors cursor-pointer"
-                          >
-                            {bp.referenceThumbnails?.[0] ? (
-                              <img
-                                src={bp.referenceThumbnails[0]}
-                                alt={bp.title}
-                                className="w-12 h-12 rounded-xl object-cover border border-white/10 shrink-0"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400 shrink-0">
-                                <Layers className="w-4 h-4" />
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="font-display text-xs font-bold text-white truncate">
-                                {bp.title}
-                              </div>
-                              <div className="text-[11px] font-mono text-zinc-400 mt-0.5 truncate tabular-nums">
-                                {bp.outputRatio} · {new Date(bp.updatedAt || bp.createdAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* DEDICATED WORKSPACE VIEW */}
-            {activeNav === 'tools' && isWorkspaceOpen && (
-              <div className="space-y-5">
-                {/* Workspace Switcher Bar */}
-                <div className="studio-panel rounded-2xl p-2.5 sm:px-3.5 flex flex-wrap items-center justify-between gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic();
-                      setIsWorkspaceOpen(false);
-                    }}
-                    className="min-h-[40px] px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-zinc-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5 text-[#f5c518]" />
-                    <span>Studio Hub</span>
-                  </button>
-
-                  {/* Quick Switcher between the 4 Workspace Tools */}
-                  <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
-                    {(
-                      [
-                        { id: 'general_extractor', label: 'Extractor' },
-                        { id: 'subject_swapping', label: 'Swap Studio' },
-                        { id: 'perspective_playboard', label: '3D Playboard' },
-                        { id: 'camera_ai', label: 'Camera AI' },
-                      ] as const
-                    ).map((t) => {
-                      const active = activeTool === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => handleSelectTool(t.id)}
-                          className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
-                            active
-                              ? 'bg-[#f5c518] text-black font-bold'
-                              : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                          onClick={() => setHubCategory(cat.id)}
+                          className={`min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border transition cursor-pointer whitespace-nowrap shrink-0 ${
+                            isActive
+                              ? 'bg-cyan-400/15 border-cyan-400/70 text-cyan-200 shadow-[0_0_16px_-6px_rgba(34,211,238,0.6)]'
+                              : 'bg-[#0e131e] border-white/[0.08] text-zinc-300 hover:text-white hover:border-white/20'
                           }`}
                         >
-                          {t.label}
+                          <CatIcon
+                            className={`w-3.5 h-3.5 ${
+                              isActive ? 'text-cyan-300' : 'text-zinc-400'
+                            }`}
+                          />
+                          <span>{cat.label}</span>
                         </button>
                       );
                     })}
                   </div>
-                </div>
 
-                {/* Render Dedicated Workspace for Active Tool */}
-                {(activeTool as string) === 'subject_swapping' ? (
-                  <SwapStudio
-                    optimizeImageFile={optimizeImageFile}
-                    onOpenProjects={() => setActiveNav('projects')}
-                  />
-                ) : (activeTool as string) === 'camera_ai' ? (
-                  <CameraAI
-                    optimizeImageFile={optimizeImageFile}
-                    onOpenProjects={() => setActiveNav('projects')}
-                  />
-                ) : (activeTool as string) === 'perspective_playboard' ? (
-                  <PerspectivePlayboard
-                    optimizeImageFile={optimizeImageFile}
-                    onOpenProjects={() => setActiveNav('projects')}
-                  />
-                ) : (
-                  <GeneralExtractorWorkspace
-                    activeTool={activeTool}
-                    referenceImage={referenceImage}
-                    isDragging={isDragging}
-                    setIsDragging={setIsDragging}
-                    onFileDrop={handleFileDrop}
-                    onOpenFilePicker={() => fileInputRef.current?.click()}
-                    onClearReference={() => {
-                      setReferenceImage(null);
-                      setComponents(null);
-                      setOriginalComponents(null);
-                      setGeneratedMasterPrompt(null);
-                    }}
-                    isScanning={isScanning}
-                    scanStageIndex={scanStageIndex}
-                    scanError={scanError}
-                    fallbackNotice={fallbackNotice}
-                    onScanReference={handleScanReference}
-                    isQuotaFallback={isQuotaFallback}
-                    quotaFallbackAcknowledged={quotaFallbackAcknowledged}
-                    onAcknowledgeQuotaFallback={() => setQuotaFallbackAcknowledged(true)}
-                    lowVisibilityError={lowVisibilityError}
-                    hasMultiSnapshotReady={Boolean(
-                      multiCanonicalSnapshot && multiCanonicalSnapshot.visibleCount >= 3
-                    )}
-                    onConsiderAllSubjects={handleConsiderAllSubjects}
-                    onContinueManuallyAfterLowVis={() => {
-                      setLowVisibilityError(null);
-                      if (components) {
-                        const manualComps = { ...components };
-                        for (const k of ALL_COMPONENT_KEYS) {
-                          if (manualComps[k]?.state === 'unavailable') {
-                            manualComps[k] = {
-                              ...manualComps[k],
-                              state: 'edited',
-                              visibility: 'visible',
-                            };
-                          }
+                  {/* Tool Launch Cards Grid */}
+                  <section aria-label="Creative studio tools" className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                      {filteredHubTools.map((tool) => {
+                        const Icon = tool.icon;
+                        if (tool.id === 'camera_controller') {
+                          return (
+                            <div
+                              key={tool.id}
+                              className="studio-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 hover:border-cyan-400/45 transition-colors"
+                            >
+                              <div className="flex items-start gap-3.5">
+                                <div className="w-12 h-12 rounded-2xl bg-cyan-400/12 border border-cyan-400/30 flex items-center justify-center text-cyan-300 shrink-0">
+                                  <Icon className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0 space-y-1">
+                                  <h3 className="font-display text-sm sm:text-base font-bold text-white">
+                                    {tool.title}
+                                  </h3>
+                                  <p className="text-xs text-zinc-400 leading-relaxed">{tool.desc}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 pt-3 border-t border-white/[0.07]">
+                                <a
+                                  href="/camera-controller"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => handleCameraNewTabLaunch('playboard')}
+                                  className="flex-1 min-h-[40px] px-3.5 py-2 rounded-full bg-cyan-400/15 hover:bg-cyan-400/25 border border-cyan-400/50 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                                >
+                                  <span>Launch New Tab</span>
+                                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => openCameraInCurrentTab('playboard')}
+                                  className="min-h-[40px] px-3.5 py-2 rounded-full bg-white/[0.05] hover:bg-white/[0.11] text-zinc-200 border border-white/10 text-xs font-semibold transition cursor-pointer whitespace-nowrap"
+                                >
+                                  Open Here
+                                </button>
+                              </div>
+                            </div>
+                          );
                         }
-                        setComponents(manualComps);
+
+                        const isFeatured = tool.accent === 'featured';
+                        const isViolet = tool.accent === 'violet' || isFeatured;
+
+                        return (
+                          <button
+                            key={tool.id}
+                            type="button"
+                            onClick={() => handleSelectTool(tool.id)}
+                            className={`rounded-2xl p-4 sm:p-5 text-left flex flex-col justify-between gap-4 transition-all cursor-pointer group ${
+                              isFeatured
+                                ? 'studio-card-featured hover:border-violet-400/70'
+                                : 'studio-card hover:border-cyan-400/50 hover:bg-[#131928]'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3.5 w-full">
+                              <div
+                                className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-colors ${
+                                  isViolet
+                                    ? 'bg-violet-500/15 border-violet-400/35 text-violet-300 group-hover:bg-violet-500/25'
+                                    : 'bg-cyan-400/12 border-cyan-400/30 text-cyan-300 group-hover:bg-cyan-400/20'
+                                }`}
+                              >
+                                <Icon className="w-5 h-5" />
+                              </div>
+
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <h3 className="font-display text-sm sm:text-base font-bold text-white group-hover:text-cyan-200 transition-colors truncate">
+                                    {tool.title}
+                                  </h3>
+                                  <ArrowRight className="w-4 h-4 text-zinc-500 group-hover:text-cyan-300 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                                </div>
+                                <p className="text-xs text-zinc-400 leading-relaxed line-clamp-3">
+                                  {tool.desc}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] w-full">
+                              <span className="text-[11px] font-mono text-zinc-500">
+                                {tool.index} · {tool.tag}
+                              </span>
+                              <span
+                                className={`min-h-[32px] px-3.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 border transition ${
+                                  isViolet
+                                    ? 'border-violet-400/60 bg-violet-500/15 text-violet-200 group-hover:bg-violet-500/25'
+                                    : 'border-cyan-400/60 bg-cyan-400/12 text-cyan-200 group-hover:bg-cyan-400/22'
+                                }`}
+                              >
+                                <Play className="w-3 h-3" />
+                                <span>Launch</span>
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Graceful Popup Restriction Fallback Banner */}
+                    {popupFallbackBanner && (
+                      <div className="p-3.5 rounded-xl bg-[#0e1422] border border-cyan-400/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="text-xs text-zinc-200">
+                          <span className="font-bold text-white">
+                            Camera Angle Controller launched in a new tab.
+                          </span>{' '}
+                          If popups are blocked on mobile, open it directly in this tab:
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openCameraInCurrentTab('playboard')}
+                            className="min-h-[38px] px-3.5 py-1.5 rounded-xl studio-cta-primary text-xs font-bold transition cursor-pointer"
+                          >
+                            Open in Current Tab
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPopupFallbackBanner(false)}
+                            className="min-h-[38px] px-2.5 py-1.5 rounded-xl text-xs text-zinc-400 hover:text-white cursor-pointer"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Recent Saved Projects Quick Resume */}
+                  {(() => {
+                    const recentBlueprints = StorageService.getBlueprints().slice(0, 3);
+                    if (recentBlueprints.length === 0) return null;
+                    return (
+                      <section aria-label="Recent saved projects" className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h2 className="font-display text-sm font-bold text-white tracking-tight">
+                            Recent Projects
+                          </h2>
+                          <button
+                            type="button"
+                            onClick={() => setActiveNav('projects')}
+                            className="text-xs font-semibold text-cyan-300 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>View All</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {recentBlueprints.map((bp) => (
+                            <button
+                              key={bp.id}
+                              type="button"
+                              onClick={() => handleLoadBlueprint(bp)}
+                              className="studio-card hover:border-cyan-400/45 rounded-2xl p-3.5 text-left flex items-center gap-3 transition-colors cursor-pointer"
+                            >
+                              {bp.referenceThumbnails?.[0] ? (
+                                <img
+                                  src={bp.referenceThumbnails[0]}
+                                  alt={bp.title}
+                                  className="w-12 h-12 rounded-xl object-cover border border-white/10 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-cyan-300 shrink-0">
+                                  <Layers className="w-4 h-4" />
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="font-display text-xs font-bold text-white truncate">
+                                  {bp.title}
+                                </div>
+                                <div className="text-[11px] font-mono text-zinc-400 mt-0.5 truncate tabular-nums">
+                                  {bp.outputRatio} ·{' '}
+                                  {new Date(bp.updatedAt || bp.createdAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* DEDICATED WORKSPACE VIEW */}
+              {activeNav === 'tools' && isWorkspaceOpen && (
+                <div className="space-y-4">
+                  {/* Compact Mobile/Tablet Tool Switcher (Desktop uses Sidebar Rail) */}
+                  <div className="lg:hidden studio-panel rounded-2xl p-2 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic();
+                        setIsWorkspaceOpen(false);
+                      }}
+                      className="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.11] border border-white/10 text-zinc-100 text-xs font-semibold flex items-center gap-1 transition cursor-pointer shrink-0"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Hub</span>
+                    </button>
+
+                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
+                      {(
+                        [
+                          { id: 'general_extractor', label: 'Extractor' },
+                          { id: 'subject_swapping', label: 'Swap' },
+                          { id: 'camera_ai', label: 'Camera AI' },
+                          { id: 'perspective_playboard', label: '3D Rig' },
+                        ] as const
+                      ).map((t) => {
+                        const active = activeTool === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => handleSelectTool(t.id)}
+                            className={`min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
+                              active
+                                ? 'bg-cyan-400/20 border border-cyan-400/50 text-cyan-200'
+                                : 'text-zinc-400 hover:text-white hover:bg-white/[0.05] border border-transparent'
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Render Dedicated Workspace for Active Tool */}
+                  {(activeTool as string) === 'subject_swapping' ? (
+                    <SwapStudio
+                      optimizeImageFile={optimizeImageFile}
+                      onOpenProjects={() => setActiveNav('projects')}
+                    />
+                  ) : (activeTool as string) === 'camera_ai' ? (
+                    <CameraAI
+                      optimizeImageFile={optimizeImageFile}
+                      onOpenProjects={() => setActiveNav('projects')}
+                    />
+                  ) : (activeTool as string) === 'perspective_playboard' ? (
+                    <PerspectivePlayboard
+                      optimizeImageFile={optimizeImageFile}
+                      onOpenProjects={() => setActiveNav('projects')}
+                    />
+                  ) : (
+                    <GeneralExtractorWorkspace
+                      activeTool={activeTool}
+                      referenceImage={referenceImage}
+                      isDragging={isDragging}
+                      setIsDragging={setIsDragging}
+                      onFileDrop={handleFileDrop}
+                      onOpenFilePicker={() => fileInputRef.current?.click()}
+                      onClearReference={() => {
+                        setReferenceImage(null);
+                        setComponents(null);
+                        setOriginalComponents(null);
+                        setGeneratedMasterPrompt(null);
+                      }}
+                      isScanning={isScanning}
+                      scanStageIndex={scanStageIndex}
+                      scanError={scanError}
+                      fallbackNotice={fallbackNotice}
+                      onScanReference={handleScanReference}
+                      isQuotaFallback={isQuotaFallback}
+                      quotaFallbackAcknowledged={quotaFallbackAcknowledged}
+                      onAcknowledgeQuotaFallback={() => setQuotaFallbackAcknowledged(true)}
+                      lowVisibilityError={lowVisibilityError}
+                      hasMultiSnapshotReady={Boolean(
+                        multiCanonicalSnapshot && multiCanonicalSnapshot.visibleCount >= 3
+                      )}
+                      onConsiderAllSubjects={handleConsiderAllSubjects}
+                      onContinueManuallyAfterLowVis={() => {
+                        setLowVisibilityError(null);
+                        if (components) {
+                          const manualComps = { ...components };
+                          for (const k of ALL_COMPONENT_KEYS) {
+                            if (manualComps[k]?.state === 'unavailable') {
+                              manualComps[k] = {
+                                ...manualComps[k],
+                                state: 'edited',
+                                visibility: 'visible',
+                              };
+                            }
+                          }
+                          setComponents(manualComps);
+                        }
+                      }}
+                      isDebugEnabled={isDebugEnabled}
+                      onToggleDebug={handleToggleDebug}
+                      scanDebugReport={scanDebugReport}
+                      isDebugPanelOpen={isDebugPanelOpen}
+                      onToggleDebugPanelOpen={() => setIsDebugPanelOpen((prev) => !prev)}
+                      debugCopyFeedback={debugCopyFeedback}
+                      onCopyDebugReport={handleCopyDebugReport}
+                      soloRewriteWarning={soloRewriteWarning}
+                      isRewritingFields={isRewritingFields}
+                      onRewriteFieldsSolo={handleRewriteFieldsSolo}
+                      components={components}
+                      componentCounts={componentCounts}
+                      scanSummary={scanSummary}
+                      detectedSubjects={detectedSubjects}
+                      activeSubjectDecision={activeSubjectDecision}
+                      onOpenMultiSubjectModal={() => setIsMultiSubjectModalOpen(true)}
+                      tickedComponentKeys={tickedComponentKeys}
+                      onOpenChecklistModal={() => setIsChecklistStepOpen(true)}
+                      onRestoreAllOriginal={handleRestoreAllOriginal}
+                      projectTitleInput={projectTitleInput}
+                      onChangeProjectTitleInput={setProjectTitleInput}
+                      onSaveBlueprint={handleSaveBlueprint}
+                      savedBlueprintNotice={savedBlueprintNotice}
+                      outputRatio={outputRatio}
+                      ratioExplanation={ratioExplanation}
+                      onChangeOutputRatio={(ratio) => {
+                        triggerHaptic();
+                        setOutputRatio(ratio);
+                        if (generatedMasterPrompt) setHasUnbuiltChanges(true);
+                      }}
+                      sceneFilter={sceneFilter}
+                      onChangeSceneFilter={(filter) => {
+                        triggerHaptic();
+                        setSceneFilter(filter);
+                      }}
+                      sceneAccordionGroups={SCENE_ACCORDION_GROUPS}
+                      openSceneGroups={openSceneGroups}
+                      onToggleSceneGroup={(groupId) => {
+                        triggerHaptic();
+                        setOpenSceneGroups((prev) => ({
+                          ...prev,
+                          [groupId]: !(prev[groupId] !== false),
+                        }));
+                      }}
+                      onExpandAllGroups={() =>
+                        setOpenSceneGroups({
+                          identity_pose: true,
+                          camera_framing: true,
+                          wardrobe_scene: true,
+                          expression_gestures: true,
+                        })
                       }
-                    }}
-                    isDebugEnabled={isDebugEnabled}
-                    onToggleDebug={handleToggleDebug}
-                    scanDebugReport={scanDebugReport}
-                    isDebugPanelOpen={isDebugPanelOpen}
-                    onToggleDebugPanelOpen={() => setIsDebugPanelOpen((prev) => !prev)}
-                    debugCopyFeedback={debugCopyFeedback}
-                    onCopyDebugReport={handleCopyDebugReport}
-                    soloRewriteWarning={soloRewriteWarning}
-                    isRewritingFields={isRewritingFields}
-                    onRewriteFieldsSolo={handleRewriteFieldsSolo}
-                    components={components}
-                    componentCounts={componentCounts}
-                    scanSummary={scanSummary}
-                    detectedSubjects={detectedSubjects}
-                    activeSubjectDecision={activeSubjectDecision}
-                    onOpenMultiSubjectModal={() => setIsMultiSubjectModalOpen(true)}
-                    tickedComponentKeys={tickedComponentKeys}
-                    onOpenChecklistModal={() => setIsChecklistStepOpen(true)}
-                    onRestoreAllOriginal={handleRestoreAllOriginal}
-                    projectTitleInput={projectTitleInput}
-                    onChangeProjectTitleInput={setProjectTitleInput}
-                    onSaveBlueprint={handleSaveBlueprint}
-                    savedBlueprintNotice={savedBlueprintNotice}
-                    outputRatio={outputRatio}
-                    ratioExplanation={ratioExplanation}
-                    onChangeOutputRatio={(ratio) => {
-                      triggerHaptic();
-                      setOutputRatio(ratio);
-                      if (generatedMasterPrompt) setHasUnbuiltChanges(true);
-                    }}
-                    sceneFilter={sceneFilter}
-                    onChangeSceneFilter={(filter) => {
-                      triggerHaptic();
-                      setSceneFilter(filter);
-                    }}
-                    sceneAccordionGroups={SCENE_ACCORDION_GROUPS}
-                    openSceneGroups={openSceneGroups}
-                    onToggleSceneGroup={(groupId) => {
-                      triggerHaptic();
-                      setOpenSceneGroups((prev) => ({
-                        ...prev,
-                        [groupId]: !(prev[groupId] !== false),
-                      }));
-                    }}
-                    onExpandAllGroups={() =>
-                      setOpenSceneGroups({
-                        identity_pose: true,
-                        camera_framing: true,
-                        wardrobe_scene: true,
-                        expression_gestures: true,
-                      })
-                    }
-                    onCollapseAllGroups={() =>
-                      setOpenSceneGroups({
-                        identity_pose: false,
-                        camera_framing: false,
-                        wardrobe_scene: false,
-                        expression_gestures: false,
-                      })
-                    }
-                    onUpdateComponentState={handleUpdateComponentState}
-                    onUpdateComponentText={handleUpdateComponentText}
-                    onApplyBackgroundBundle={handleApplyBackgroundBundle}
-                    generatedMasterPrompt={generatedMasterPrompt}
-                    exportedPrompt={exportedPrompt}
-                    hasUnbuiltChanges={hasUnbuiltChanges}
-                    onGenerateFinalPrompt={handleGenerateFinalPrompt}
-                    targetModel={targetModel}
-                    onSetTargetModel={setTargetModel}
-                    showNegativePrompt={showNegativePrompt}
-                    onSetShowNegativePrompt={setShowNegativePrompt}
-                    generatedNegativePrompt={generatedNegativePrompt}
-                    onSetGeneratedNegativePrompt={setGeneratedNegativePrompt}
-                    promptCheck={promptCheck}
-                    onApplySafetyFix={handleApplySafetyFix}
-                    onCopyPrompt={handleCopyPrompt}
-                    onDownloadPrompt={handleDownloadPrompt}
-                    copyFeedback={copyFeedback}
-                  />
-                )}
-              </div>
-            )}
+                      onCollapseAllGroups={() =>
+                        setOpenSceneGroups({
+                          identity_pose: false,
+                          camera_framing: false,
+                          wardrobe_scene: false,
+                          expression_gestures: false,
+                        })
+                      }
+                      onUpdateComponentState={handleUpdateComponentState}
+                      onUpdateComponentText={handleUpdateComponentText}
+                      onApplyBackgroundBundle={handleApplyBackgroundBundle}
+                      generatedMasterPrompt={generatedMasterPrompt}
+                      exportedPrompt={exportedPrompt}
+                      hasUnbuiltChanges={hasUnbuiltChanges}
+                      onGenerateFinalPrompt={handleGenerateFinalPrompt}
+                      targetModel={targetModel}
+                      onSetTargetModel={setTargetModel}
+                      showNegativePrompt={showNegativePrompt}
+                      onSetShowNegativePrompt={setShowNegativePrompt}
+                      generatedNegativePrompt={generatedNegativePrompt}
+                      onSetGeneratedNegativePrompt={setGeneratedNegativePrompt}
+                      promptCheck={promptCheck}
+                      onApplySafetyFix={handleApplySafetyFix}
+                      onCopyPrompt={handleCopyPrompt}
+                      onDownloadPrompt={handleDownloadPrompt}
+                      copyFeedback={copyFeedback}
+                    />
+                  )}
+                </div>
+              )}
 
-            {/* TAB 2: PROFILES */}
-            {activeNav === 'profiles' && (
-              <ProfileManager
-                activeProfileId={activeProfile.id}
-                onSelectProfile={handleSelectProfile}
-                activeOutfitId={activeOutfit.id}
-                onSelectOutfit={handleSelectOutfit}
-              />
-            )}
+              {/* TAB 2: PROFILES */}
+              {activeNav === 'profiles' && (
+                <ProfileManager
+                  activeProfileId={activeProfile.id}
+                  onSelectProfile={handleSelectProfile}
+                  activeOutfitId={activeOutfit.id}
+                  onSelectOutfit={handleSelectOutfit}
+                />
+              )}
 
-            {/* TAB 3: PROJECTS */}
-            {activeNav === 'projects' && (
-              <BlueprintProjects onLoadBlueprint={handleLoadBlueprint} />
-            )}
-          </main>
+              {/* TAB 3: PROJECTS */}
+              {activeNav === 'projects' && (
+                <BlueprintProjects onLoadBlueprint={handleLoadBlueprint} />
+              )}
+            </main>
+          </div>
 
-          {/* Clean Footer (Hidden in dedicated tool workspaces on mobile to prioritize content) */}
-          <footer className="hidden md:block border-t border-white/[0.07] bg-[#07090e] py-5 px-4 text-xs text-zinc-500">
-            <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="font-display font-bold text-zinc-300">My Whisk AI</span>
-                <span aria-hidden="true">·</span>
-                <span>Visual Prompt &amp; Camera Reference Studio</span>
-              </div>
-              <div className="text-[11px] font-mono text-zinc-500">
-                Local-first profiles &amp; projects storage
-              </div>
-            </div>
-          </footer>
-
-          {/* Thumb-Friendly Mobile Bottom Navigation (Hidden inside open tool workspaces to avoid stacking) */}
+          {/* 4-Tab Fixed Mobile Bottom Navigation (Mirrors Image 2: Home | Tools | Projects | Profiles) */}
           {(!isWorkspaceOpen || activeNav !== 'tools') && (
             <nav
               aria-label="Mobile navigation"
-              className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-14 pb-safe-nav bg-[#0a0d14]/95 border-t border-white/[0.09] px-2 flex items-center justify-around"
+              className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-16 pb-safe-nav bg-[#080b13]/95 backdrop-blur-md border-t border-white/[0.09] px-2 flex items-center justify-around"
             >
               {(
                 [
-                  { id: 'tools', label: 'Studio Hub', icon: Wrench },
-                  { id: 'profiles', label: 'Profiles', icon: Users },
-                  { id: 'projects', label: 'Projects', icon: FolderKanban },
-                ] as const
+                  {
+                    id: 'home' as const,
+                    label: 'Home',
+                    icon: Home,
+                    active: activeNav === 'tools' && !isWorkspaceOpen,
+                    onClick: () => {
+                      triggerHaptic();
+                      setActiveNav('tools');
+                      setIsWorkspaceOpen(false);
+                    },
+                  },
+                  {
+                    id: 'tools' as const,
+                    label: 'Tools',
+                    icon: LayoutGrid,
+                    active: activeNav === 'tools' && isWorkspaceOpen,
+                    onClick: () => {
+                      triggerHaptic();
+                      setActiveNav('tools');
+                      setIsWorkspaceOpen(true);
+                    },
+                  },
+                  {
+                    id: 'projects' as const,
+                    label: 'Projects',
+                    icon: FolderKanban,
+                    active: activeNav === 'projects',
+                    onClick: () => {
+                      triggerHaptic();
+                      setActiveNav('projects');
+                    },
+                  },
+                  {
+                    id: 'profiles' as const,
+                    label: 'Profiles',
+                    icon: Users,
+                    active: activeNav === 'profiles',
+                    onClick: () => {
+                      triggerHaptic();
+                      setActiveNav('profiles');
+                    },
+                  },
+                ]
               ).map((item) => {
                 const Icon = item.icon;
-                const active = activeNav === item.id;
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => {
-                      triggerHaptic();
-                      setActiveNav(item.id);
-                      if (item.id === 'tools') setIsWorkspaceOpen(false);
-                    }}
-                    className={`min-h-[44px] flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition cursor-pointer ${
-                      active ? 'text-[#f5c518]' : 'text-zinc-400 hover:text-zinc-200'
+                    onClick={item.onClick}
+                    className={`relative min-h-[46px] flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition cursor-pointer ${
+                      item.active ? 'text-cyan-300' : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span>{item.label}</span>
+                    {item.active && (
+                      <span className="w-5 h-0.5 rounded-full bg-cyan-400 mt-0.5" />
+                    )}
                   </button>
                 );
               })}
-              <button
-                type="button"
-                onClick={() => handleSelectTool('perspective_playboard')}
-                className="min-h-[44px] flex-1 rounded-xl flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold text-zinc-300 hover:text-[#f5c518] transition cursor-pointer"
-              >
-                <Compass className="w-4 h-4 text-[#f5c518]" />
-                <span>3D Rig</span>
-              </button>
             </nav>
           )}
+
+          {/* Mobile Quick Workspaces & Navigation Bottom Sheet */}
+          <BottomSheet
+            isOpen={isMobileDrawerOpen}
+            onClose={() => setIsMobileDrawerOpen(false)}
+            title="Whiskai Studio"
+            subtitle="Jump directly to any workspace or saved collection"
+            icon={<Sparkles className="w-4 h-4" />}
+          >
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+                  Workspaces
+                </div>
+                {HUB_TOOLS.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <button
+                      key={tool.id}
+                      type="button"
+                      onClick={() => {
+                        setIsMobileDrawerOpen(false);
+                        if (tool.id === 'camera_controller') {
+                          openCameraInCurrentTab('playboard');
+                        } else {
+                          handleSelectTool(tool.id);
+                        }
+                      }}
+                      className="w-full p-3 rounded-xl bg-[#0b101b] hover:bg-[#131a2a] border border-white/[0.08] flex items-center gap-3 text-left cursor-pointer"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-cyan-400/12 border border-cyan-400/30 text-cyan-300 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold text-white truncate">{tool.title}</div>
+                        <div className="text-[11px] text-zinc-400 truncate">{tool.tag}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/[0.08]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileDrawerOpen(false);
+                    setActiveNav('projects');
+                  }}
+                  className="min-h-[42px] px-3 rounded-xl bg-white/[0.05] border border-white/10 text-xs font-semibold text-zinc-200 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <FolderKanban className="w-4 h-4 text-cyan-400" />
+                  <span>Projects ({projectCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileDrawerOpen(false);
+                    setActiveNav('profiles');
+                  }}
+                  className="min-h-[42px] px-3 rounded-xl bg-white/[0.05] border border-white/10 text-xs font-semibold text-zinc-200 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Users className="w-4 h-4 text-violet-400" />
+                  <span>Profiles ({profileCount})</span>
+                </button>
+              </div>
+            </div>
+          </BottomSheet>
+
+          {/* API Key Connection Modal */}
+          <KeyModal
+            isOpen={isKeyModalOpen}
+            onClose={() => setIsKeyModalOpen(false)}
+            onSaved={() => setCustomKeyTick((n) => n + 1)}
+            hasServerKey={hasServerKey}
+          />
 
           {/* Multi-Subject Decision Bottom Sheet / Modal */}
           <BottomSheet
@@ -2444,9 +2831,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleConsiderAllSubjects}
-                className="w-full min-h-[56px] p-4 rounded-xl bg-[#f5c518]/12 hover:bg-[#f5c518]/18 border border-[#f5c518]/45 text-left transition space-y-1 cursor-pointer"
+                className="w-full min-h-[56px] p-4 rounded-xl bg-cyan-400/12 hover:bg-cyan-400/20 border border-cyan-400/45 text-left transition space-y-1 cursor-pointer"
               >
-                <div className="flex items-center justify-between gap-2 font-bold text-sm text-[#f5c518]">
+                <div className="flex items-center justify-between gap-2 font-bold text-sm text-cyan-200">
                   <span>Consider all subjects in scene</span>
                   <span className="text-xs font-mono">Multi-Subject</span>
                 </div>
@@ -2467,7 +2854,7 @@ export default function App() {
                   className="w-full min-h-[52px] p-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition flex items-center justify-between gap-3 cursor-pointer"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-[#161b28] flex items-center justify-center font-bold text-xs text-[#f5c518] border border-white/10 shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-[#161b28] flex items-center justify-center font-bold text-xs text-cyan-300 border border-white/10 shrink-0">
                       {subject.id}
                     </div>
                     <div className="min-w-0">
@@ -2477,7 +2864,7 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <span className="text-xs font-semibold text-[#f5c518] shrink-0">
+                  <span className="text-xs font-semibold text-cyan-300 shrink-0">
                     Keep Subject {subject.id}
                   </span>
                 </button>
@@ -2503,7 +2890,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setTickedComponentKeys([...ALL_COMPONENT_KEYS])}
-                    className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-[#f5c518] bg-[#f5c518]/12 hover:bg-[#f5c518]/20 rounded-lg transition cursor-pointer"
+                    className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-cyan-200 bg-cyan-400/15 hover:bg-cyan-400/25 rounded-lg transition cursor-pointer"
                   >
                     Select All
                   </button>
@@ -2532,7 +2919,7 @@ export default function App() {
                       key={key}
                       className={`flex items-start gap-3 p-3 rounded-xl border transition cursor-pointer ${
                         isChecked
-                          ? 'bg-[#f5c518]/10 border-[#f5c518]/40'
+                          ? 'bg-cyan-400/10 border-cyan-400/45'
                           : 'bg-white/[0.02] border-white/10 hover:bg-white/[0.04]'
                       }`}
                     >
@@ -2540,7 +2927,7 @@ export default function App() {
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => handleToggleChecklistKey(key)}
-                        className="mt-1 accent-[#f5c518] w-4 h-4 rounded cursor-pointer"
+                        className="mt-1 w-4 h-4 rounded cursor-pointer"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
@@ -2571,7 +2958,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleFinishChecklist}
-                    className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer"
+                    className="min-h-[44px] px-5 py-2.5 rounded-xl studio-cta-primary font-bold text-xs transition cursor-pointer"
                   >
                     Continue with Selected Components
                   </button>
@@ -2643,9 +3030,9 @@ export default function App() {
                   className="min-h-[42px] px-4 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-white font-semibold text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isPerformingDeepCheck ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#f5c518]" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
                   ) : (
-                    <Sparkles className="w-3.5 h-3.5 text-[#f5c518]" />
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
                   )}
                   <span>Deep AI Check</span>
                 </button>
@@ -2664,7 +3051,7 @@ export default function App() {
                       setIsContradictionModalOpen(false);
                       if (components) buildAndSetFinalPrompt(components);
                     }}
-                    className="min-h-[42px] px-5 py-2 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black font-bold text-xs transition cursor-pointer"
+                    className="min-h-[42px] px-5 py-2 rounded-xl studio-cta-primary font-bold text-xs transition cursor-pointer"
                   >
                     Proceed &amp; Generate
                   </button>

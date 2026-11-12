@@ -19,19 +19,19 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
   if (isInstallable) {
     if (variant === 'banner') {
       return (
-        <div className="flex items-center justify-between gap-3 p-3 bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-transparent border border-amber-500/30 rounded-xl mb-4">
+        <div className="flex items-center justify-between gap-3 p-3 bg-gradient-to-r from-cyan-500/15 via-violet-500/10 to-transparent border border-cyan-400/30 rounded-xl">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-400 text-black flex items-center justify-center font-black">
-              🍌
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 text-slate-950 flex items-center justify-center font-display font-black text-sm">
+              W
             </div>
             <div>
-              <div className="text-xs font-bold text-white">Install My Whisk PWA</div>
+              <div className="text-xs font-bold text-white">Install Whiskai PWA</div>
               <div className="text-[11px] text-zinc-400">Launch from home screen, offline ready</div>
             </div>
           </div>
           <button
             onClick={install}
-            className="flex items-center gap-1.5 bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold px-3 py-1.5 rounded-lg transition active:scale-95 shadow-sm"
+            className="flex items-center gap-1.5 studio-cta-primary text-xs font-bold px-3 py-1.5 rounded-lg transition active:scale-95 shadow-sm cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             Install
@@ -43,11 +43,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
     return (
       <button
         onClick={install}
-        className="min-h-[36px] flex items-center gap-1.5 rounded-xl bg-[#f5c518]/15 hover:bg-[#f5c518]/25 text-[#f5c518] border border-[#f5c518]/40 px-3 py-1.5 text-xs font-semibold transition active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
-        title="Install My Whisk to Home Screen"
+        className="w-full min-h-[38px] flex items-center justify-center gap-1.5 rounded-xl bg-cyan-400/12 hover:bg-cyan-400/20 text-cyan-200 border border-cyan-400/35 px-3 py-1.5 text-xs font-semibold transition active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
+        title="Install Whiskai to Home Screen"
       >
         <Download className="w-3.5 h-3.5" />
-        <span>Install App</span>
+        <span>Install Whiskai App</span>
       </button>
     );
   }
@@ -58,38 +58,38 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
       <>
         <button
           onClick={() => setShowIOSGuide(true)}
-          className="min-h-[36px] flex items-center gap-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 border border-white/10 px-3 py-1.5 text-xs font-medium transition active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
+          className="w-full min-h-[38px] flex items-center justify-center gap-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 border border-white/10 px-3 py-1.5 text-xs font-medium transition active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
           title="Install on iPhone / iPad"
         >
-          <Download className="w-3.5 h-3.5 text-[#f5c518]" />
+          <Download className="w-3.5 h-3.5 text-cyan-400" />
           <span>Install PWA</span>
         </button>
 
         {showIOSGuide && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="w-full max-w-sm rounded-2xl bg-[#11131a] border border-[#303544] p-5 shadow-2xl text-left">
+            <div className="w-full max-w-sm rounded-2xl bg-[#0d111a] border border-white/15 p-5 shadow-2xl text-left">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#f5c518] text-black flex items-center justify-center font-bold text-sm">
-                    🍌
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 text-slate-950 flex items-center justify-center font-display font-black text-sm">
+                    W
                   </div>
                   <h3 className="text-base font-bold text-white">Install on iPhone / iPad</h3>
                 </div>
                 <button
                   onClick={() => setShowIOSGuide(false)}
-                  className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-                Add <b>My Whisk</b> to your Home Screen for a full-screen, native app experience with offline access:
+                Add <b>Whiskai</b> to your Home Screen for a full-screen app experience with offline access:
               </p>
 
               <div className="space-y-3 mb-5">
-                <div className="flex items-start gap-3 bg-[#181b24] p-3 rounded-xl border border-[#303544]">
-                  <div className="w-6 h-6 rounded-md bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                <div className="flex items-start gap-3 bg-[#121826] p-3 rounded-xl border border-white/[0.08]">
+                  <div className="w-6 h-6 rounded-md bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0">
                     <Share2 className="w-3.5 h-3.5" />
                   </div>
                   <div className="text-xs text-zinc-200">
@@ -97,8 +97,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 bg-[#181b24] p-3 rounded-xl border border-[#303544]">
-                  <div className="w-6 h-6 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <div className="flex items-start gap-3 bg-[#121826] p-3 rounded-xl border border-white/[0.08]">
+                  <div className="w-6 h-6 rounded-md bg-violet-500/20 text-violet-300 flex items-center justify-center shrink-0">
                     <PlusSquare className="w-3.5 h-3.5" />
                   </div>
                   <div className="text-xs text-zinc-200">
@@ -106,7 +106,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 bg-[#181b24] p-3 rounded-xl border border-[#303544]">
+                <div className="flex items-start gap-3 bg-[#121826] p-3 rounded-xl border border-white/[0.08]">
                   <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
                     <Check className="w-3.5 h-3.5" />
                   </div>
@@ -118,7 +118,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
 
               <button
                 onClick={() => setShowIOSGuide(false)}
-                className="w-full rounded-xl bg-[#202430] hover:bg-[#303544] py-2.5 text-xs font-bold text-white transition"
+                className="w-full rounded-xl bg-white/[0.08] hover:bg-white/[0.14] py-2.5 text-xs font-bold text-white transition cursor-pointer"
               >
                 Got It
               </button>

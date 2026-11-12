@@ -48,7 +48,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({ isOpen, onClose, onSaved, ha
       <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-[#0e1118] border border-white/15 p-5 shadow-2xl text-left">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#f5c518]/15 border border-[#f5c518]/35 text-[#f5c518] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-cyan-400/15 border border-cyan-400/35 text-cyan-300 flex items-center justify-center">
               <KeyRound className="w-4 h-4" />
             </div>
             <div>
@@ -89,7 +89,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({ isOpen, onClose, onSaved, ha
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="AIzaSy..."
-            className="w-full min-h-[42px] bg-[#080a0f] border border-white/15 focus:border-[#f5c518] text-white px-3.5 py-2.5 rounded-xl text-sm outline-none transition font-mono"
+            className="w-full min-h-[42px] bg-[#080a0f] border border-white/15 focus:border-cyan-400 text-white px-3.5 py-2.5 rounded-xl text-sm outline-none transition font-mono"
             autoComplete="off"
           />
           <p className="text-[11px] text-zinc-500 leading-relaxed">
@@ -117,7 +117,7 @@ export const KeyModal: React.FC<KeyModalProps> = ({ isOpen, onClose, onSaved, ha
           <button
             type="button"
             onClick={handleSave}
-            className="flex-1 min-h-[42px] py-2.5 px-4 rounded-xl bg-[#f5c518] hover:bg-[#ffe169] text-black text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+            className="flex-1 min-h-[42px] py-2.5 px-4 rounded-xl studio-cta-primary text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
             {copiedStatus ? (
               <>

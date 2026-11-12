@@ -43,7 +43,7 @@ export const PromptCheckBanner: React.FC<PromptCheckBannerProps> = ({ check, onA
             <button
               type="button"
               onClick={() => onApplyFix(n.originalPhrase, n.suggestedPhrase)}
-              className="px-2 py-0.5 rounded bg-[#f5c518]/15 text-[#f5c518] hover:bg-[#f5c518]/25 text-[10px] font-bold shrink-0 transition"
+              className="px-2 py-0.5 rounded bg-cyan-400/15 text-cyan-300 hover:bg-cyan-400/25 text-[10px] font-bold shrink-0 transition cursor-pointer"
             >
               Apply Fix
             </button>

@@ -69,11 +69,11 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
 
       {/* Divider line */}
       <div
-        className="absolute top-0 bottom-0 w-0.5 bg-[#f5c518] pointer-events-none z-10 shadow-[0_0_8px_rgba(245,197,24,0.8)]"
+        className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10 shadow-[0_0_8px_rgba(34,211,238,0.8)]"
         style={{ left: `${sliderPosition}%` }}
       >
         {/* Handle circle */}
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-[#f5c518] text-black shadow-lg flex items-center justify-center font-bold">
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-cyan-400 text-slate-950 shadow-lg flex items-center justify-center font-bold">
           <SlidersHorizontal className="w-4 h-4 rotate-90" />
         </div>
       </div>
@@ -85,7 +85,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
         </span>
       </div>
       <div className="absolute top-3 right-3 z-20 pointer-events-none">
-        <span className="bg-[#f5c518]/90 text-black text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md shadow-sm">
+        <span className="bg-cyan-400/90 text-slate-950 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md shadow-sm">
           {afterLabel}
         </span>
       </div>

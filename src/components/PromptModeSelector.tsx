@@ -26,7 +26,7 @@ export const PromptModeSelector: React.FC<PromptModeSelectorProps> = ({
       id: 'replace_subject',
       title: 'Replace Subject',
       badge: 'Mode 1',
-      icon: <UserCheck className="w-4 h-4 text-[#f5c518]" />,
+      icon: <UserCheck className="w-4 h-4 text-cyan-300" />,
       description:
         'Keep the reference scene, pose, camera, clothing, lighting and environment. Replace the subject with my saved Master Persona.',
       details:
@@ -81,7 +81,7 @@ export const PromptModeSelector: React.FC<PromptModeSelectorProps> = ({
               onClick={() => !disabled && onSelectMode(m.id)}
               className={`relative rounded-2xl p-4 transition-all flex flex-col justify-between cursor-pointer border ${
                 isSelected
-                  ? 'bg-gradient-to-b from-[#181c28] to-[#12151e] border-[#f5c518] shadow-lg shadow-amber-500/10 ring-1 ring-[#f5c518]/30'
+                  ? 'bg-gradient-to-b from-[#131b2b] to-[#0f1522] border-cyan-400/75 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-400/30'
                   : 'bg-[#11131a] border-[#262a36] hover:border-[#383e50] hover:bg-[#141722]'
               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
@@ -91,7 +91,7 @@ export const PromptModeSelector: React.FC<PromptModeSelectorProps> = ({
                     <div
                       className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                         isSelected
-                          ? 'bg-[#f5c518]/20 border border-[#f5c518]/40'
+                          ? 'bg-cyan-400/20 border border-cyan-400/40'
                           : 'bg-[#181b24] border border-[#262a36]'
                       }`}
                     >
@@ -102,7 +102,7 @@ export const PromptModeSelector: React.FC<PromptModeSelectorProps> = ({
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                       isSelected
-                        ? 'bg-[#f5c518] text-black border-[#f5c518]'
+                        ? 'bg-cyan-400 text-slate-950 border-cyan-400'
                         : 'bg-[#181b24] text-zinc-400 border-[#262a36]'
                     }`}
                   >
@@ -115,7 +115,7 @@ export const PromptModeSelector: React.FC<PromptModeSelectorProps> = ({
                 </p>
 
                 <div className="text-[11px] text-zinc-500 pt-2 border-t border-[#1f232d] flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#f5c518]/70 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shrink-0" />
                   <span className="truncate">{m.authoritySummary}</span>
                 </div>
               </div>
@@ -128,9 +128,9 @@ export const PromptModeSelector: React.FC<PromptModeSelectorProps> = ({
                     e.stopPropagation();
                     if (!disabled) onSelectMode(m.id);
                   }}
-                  className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     isSelected
-                      ? 'bg-[#f5c518] text-black font-black shadow-xs'
+                      ? 'studio-cta-primary font-black shadow-xs'
                       : 'bg-[#181b24] hover:bg-[#202534] text-zinc-300 border border-[#262a36]'
                   }`}
                 >
