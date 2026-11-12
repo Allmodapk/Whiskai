@@ -375,4 +375,222 @@ function createTestSnapshot(opts: {
   console.log('✓ Scenario G passed: Deterministic contradiction detection surfaces all conflicts cleanly');
 }
 
+// ---------------------------------------------------------------------------
+// Scenario H: Camera-First Regression — Untouched Playboard Shot Size & Bounds
+// ---------------------------------------------------------------------------
+{
+  const { snapshot: cfSnap } = createTestSnapshot({
+    azimuthDeg: 35,
+    elevationDeg: 18,
+    distanceMeters: 4.8,
+    focalLengthMm: 35,
+    rollDeg: 0,
+    aspectRatio: '16:9',
+  });
+  assert.equal(cfSnap.shotSize, 'Full-Body Shot');
+
+  const cfLocked: LockedCameraFrame = {
+    isLocked: true,
+    lockedAt: 1700000000000,
+    cameraState: cfSnap,
+  };
+  const cfPrompt = compilePerspectivePrompt({
+    lockedFrame: cfLocked,
+    sourceAnalysis: null,
+    preservation: BASE_PRESERVATION,
+    targetModel: 'flux',
+  });
+
+  assert.equal(cfPrompt.mode, 'camera_first');
+  assert.ok(cfPrompt.sections.taskObjective.includes(cfSnap.shotSize));
+  assert.ok(cfPrompt.sections.targetCameraPerspective.includes(`Shot size & scale: ${cfSnap.shotSize}`));
+  assert.ok(cfPrompt.sections.targetCameraPerspective.includes('16:9 aspect ratio'));
+  assert.ok(cfPrompt.sections.finalOutputRequirements.includes(`Output a single, clean 16:9 photograph framed as a ${cfSnap.shotSize}`));
+  assert.ok(cfPrompt.exportedText.startsWith('--ar 16:9'));
+  console.log('✓ Scenario H passed: Camera-First mode remains 100% untouched (uses Playboard shot size, bounds, and 16:9 aspect)');
+}
+
+// ---------------------------------------------------------------------------
+// Scenario I: Image-Aware Framing Lock — Chest-Up & Waist-Up & Medium Source Photos
+// Even when the 3D Playboard mannequin sits at Full-Body Shot / 16:9, source framing wins.
+// ---------------------------------------------------------------------------
+{
+  const { snapshot: fullBodyPlayboardSnap } = createTestSnapshot({
+    azimuthDeg: -45,
+    elevationDeg: 28,
+    distanceMeters: 4.0,
+    focalLengthMm: 35,
+    rollDeg: 0,
+    aspectRatio: '16:9',
+  });
+  assert.equal(fullBodyPlayboardSnap.shotSize, 'Full-Body Shot');
+
+  const lockedRig: LockedCameraFrame = {
+    isLocked: true,
+    lockedAt: 1700000000000,
+    cameraState: fullBodyPlayboardSnap,
+  };
+
+  const makeMockSource = (opts: {
+    shot_size: string;
+    aspect_ratio: string;
+    crop_behavior: string;
+    subject_position: string;
+    headroom: string;
+  }) =>
+    mapBaseAnalysisToSourceAnalysis(
+      {
+        subject_type_and_count: 'Single woman in studio portrait',
+        pose: 'Seated upright facing slightly right',
+        head_orientation: 'Facing camera-front',
+        gaze_direction: 'Looking directly at original lens',
+        clothing_details: 'Olive ribbed knit top',
+        environment_and_background: 'Warm textured studio backdrop',
+        lighting_details: 'Soft diffused key light from camera-left',
+        current_camera: {
+          pitch_deg: 0,
+          pitch_range: [-5, 5],
+          pitch_confidence: 0.9,
+          pitch_label: 'eye level',
+          camera_height: 'eye level',
+          camera_height_meters: 1.5,
+          camera_height_confidence: 0.85,
+          azimuth_deg: 0,
+          azimuth_range: [-8, 8],
+          azimuth_confidence: 0.9,
+          azimuth_reference_axis: 'Subject facing direction',
+          distance_label: 'close',
+          distance_meters: 1.4,
+          distance_confidence: 0.8,
+          perspective_strength_rating: 'Natural 50mm portrait perspective',
+          focal_length_mm: 50,
+          focal_length_range: [45, 60],
+          focal_length_label: 'normal',
+          focal_length_confidence: 0.8,
+          distortion_character: 'Natural compression',
+          roll_deg: 0,
+          roll_confidence: 0.95,
+          shot_size: opts.shot_size,
+          framing: {
+            aspect_ratio: opts.aspect_ratio,
+            orientation: 'Portrait',
+            subject_position_in_frame: opts.subject_position,
+            headroom: opts.headroom,
+            lead_room: 'Balanced',
+            negative_space: 'Clean margins',
+            crop_behavior: opts.crop_behavior,
+          },
+          depth_of_field: {
+            dof_type: 'shallow',
+            focus_plane_position: 'Subject eyes',
+          },
+          camera_position_summary: 'Front portrait camera',
+        },
+        must_not_change: ['Subject identity', 'Ribbed top', 'Backdrop'],
+        geometry_risks: ['Right ear and rear hair side occluded in source'],
+      },
+      'portrait_test.jpg'
+    );
+
+  // 1) Chest-up source image
+  const chestUpSource = makeMockSource({
+    shot_size: 'chest_up',
+    aspect_ratio: '4:5',
+    crop_behavior: 'Cropped cleanly at mid-chest; lower torso, hips, legs, and feet out of frame',
+    subject_position: 'Centered upper-third',
+    headroom: '12% headroom',
+  });
+  const chestUpPrompt = compilePerspectivePrompt({
+    lockedFrame: lockedRig,
+    sourceAnalysis: chestUpSource,
+    preservation: BASE_PRESERVATION,
+    targetModel: 'flux',
+  });
+
+  assert.equal(chestUpPrompt.mode, 'image_aware');
+  assert.ok(!chestUpPrompt.fullText.includes('Full-Body Shot'), 'Must never force Full-Body Shot on chest-up source');
+  assert.ok(!chestUpPrompt.fullText.includes('key body landmarks in frame'), 'Must not leak mannequin body landmarks');
+  assert.ok(chestUpPrompt.sections.taskObjective.includes('Chest-Up Medium Close-Up'));
+  assert.ok(chestUpPrompt.sections.targetCameraPerspective.includes('-45°'));
+  assert.ok(chestUpPrompt.sections.targetCameraPerspective.includes('+28°'));
+  assert.ok(chestUpPrompt.sections.targetCameraPerspective.includes('35mm'));
+  assert.ok(chestUpPrompt.sections.targetCameraPerspective.includes('Chest-Up Medium Close-Up'));
+  assert.ok(chestUpPrompt.sections.hiddenOrUnseenDetails.includes('do NOT zoom out, uncrop, or reconstruct'));
+  assert.ok(chestUpPrompt.sections.finalOutputRequirements.includes('4:5'));
+  assert.ok(chestUpPrompt.sections.finalOutputRequirements.includes('Chest-Up Medium Close-Up'));
+  assert.ok(chestUpPrompt.exportedText.startsWith('--ar 4:5'), 'Flux export must use source 4:5 aspect ratio');
+  assert.equal(
+    chestUpPrompt.comparison.deltas.find((d) => d.variable.startsWith('Shot Size'))?.changed,
+    false
+  );
+
+  // 2) Waist-up source image
+  const waistUpSource = makeMockSource({
+    shot_size: 'waist_up',
+    aspect_ratio: '3:4',
+    crop_behavior: 'Cropped at natural waistline; legs and shoes excluded',
+    subject_position: 'Centered',
+    headroom: '10% headroom',
+  });
+  const waistUpPrompt = compilePerspectivePrompt({
+    lockedFrame: lockedRig,
+    sourceAnalysis: waistUpSource,
+    preservation: BASE_PRESERVATION,
+    targetModel: 'universal',
+  });
+  assert.ok(!waistUpPrompt.fullText.includes('Full-Body Shot'));
+  assert.ok(waistUpPrompt.sections.targetCameraPerspective.includes('Waist-Up Medium Shot'));
+  assert.ok(waistUpPrompt.sections.finalOutputRequirements.includes('3:4'));
+
+  // 3) Medium shot source image
+  const mediumSource = makeMockSource({
+    shot_size: 'medium',
+    aspect_ratio: '2:3',
+    crop_behavior: 'Mid-thigh crop; lower legs excluded',
+    subject_position: 'Slightly left of center',
+    headroom: '14% headroom',
+  });
+  const mediumPrompt = compilePerspectivePrompt({
+    lockedFrame: lockedRig,
+    sourceAnalysis: mediumSource,
+    preservation: BASE_PRESERVATION,
+    targetModel: 'universal',
+  });
+  assert.ok(!mediumPrompt.fullText.includes('Full-Body Shot'));
+  assert.ok(mediumPrompt.sections.targetCameraPerspective.includes('Medium Shot'));
+  assert.ok(mediumPrompt.sections.finalOutputRequirements.includes('2:3'));
+
+  // 4) Full-body source image
+  const fullBodySource = makeMockSource({
+    shot_size: 'full',
+    aspect_ratio: '3:4',
+    crop_behavior: 'Full body from head to shoes visible',
+    subject_position: 'Centered',
+    headroom: '10% headroom',
+  });
+  const fullBodyPrompt = compilePerspectivePrompt({
+    lockedFrame: lockedRig,
+    sourceAnalysis: fullBodySource,
+    preservation: BASE_PRESERVATION,
+    targetModel: 'universal',
+  });
+  assert.ok(fullBodyPrompt.sections.targetCameraPerspective.includes('Full-Body Shot'));
+  assert.ok(fullBodyPrompt.sections.finalOutputRequirements.includes('3:4'));
+
+  // 5) Explicit user opt-in: requireFullBodyVisibleInOutput = true on chest-up source
+  const expandedPrompt = compilePerspectivePrompt({
+    lockedFrame: lockedRig,
+    sourceAnalysis: chestUpSource,
+    preservation: {
+      ...BASE_PRESERVATION,
+      requireFullBodyVisibleInOutput: true,
+    },
+    targetModel: 'universal',
+  });
+  assert.ok(expandedPrompt.sections.taskObjective.includes('full-body visibility explicitly requested'));
+  assert.ok(expandedPrompt.sections.targetCameraPerspective.includes('Full-Body Shot'));
+  assert.ok(expandedPrompt.sections.finalOutputRequirements.includes('full-body visibility explicitly enabled'));
+  console.log('✓ Scenario I passed: Image-Aware preserves Chest-Up, Waist-Up, Medium, Full-Body source framing and respects explicit full-body opt-in');
+}
+
 console.log('All 3D Camera Perspective Playboard tests passed successfully!');

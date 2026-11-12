@@ -20,9 +20,42 @@ function describeFocalCategory(mm: number): string {
   return 'telephoto';
 }
 
+export function formatSourceShotSizeLabel(rawShotSize: string): string {
+  const trimmed = (rawShotSize || '').trim();
+  if (!trimmed) return 'Original Source Shot Size';
+  const normalized = trimmed.toLowerCase().replace(/[\s-]+/g, '_');
+  const map: Record<string, string> = {
+    ecu: 'Extreme Close-Up (ECU)',
+    extreme_closeup: 'Extreme Close-Up (ECU)',
+    extreme_close_up: 'Extreme Close-Up (ECU)',
+    cu: 'Close-Up (CU)',
+    closeup: 'Close-Up (CU)',
+    close_up: 'Close-Up (CU)',
+    mcu: 'Medium Close-Up (MCU)',
+    medium_closeup: 'Medium Close-Up (MCU)',
+    medium_close_up: 'Medium Close-Up (MCU)',
+    chest_up: 'Chest-Up Medium Close-Up',
+    bust_up: 'Chest-Up Medium Close-Up',
+    waist_up: 'Waist-Up Medium Shot',
+    medium: 'Medium Shot',
+    ms: 'Medium Shot',
+    three_quarter: 'Three-Quarter Shot',
+    three_quarters: 'Three-Quarter Shot',
+    cowboy: 'Three-Quarter Shot',
+    knee_up: 'Three-Quarter Shot (Knee-Up)',
+    full: 'Full-Body Shot',
+    full_body: 'Full-Body Shot',
+    wide: 'Wide Shot',
+    long: 'Wide Shot',
+    establishing: 'Wide Environmental Shot',
+  };
+  return map[normalized] || trimmed;
+}
+
 export function compareSourceAndTarget(
   target: CameraStateSnapshot,
-  source: SourceImageAnalysis | null
+  source: SourceImageAnalysis | null,
+  preservation?: PreservationPreferences
 ): CameraDeltaComparison {
   if (!source) {
     const deltas: CameraVariableDelta[] = [
@@ -104,12 +137,22 @@ export function compareSourceAndTarget(
     };
   }
 
-  // Image-aware comparison
+  // Image-aware comparison:
+  // Unless requireFullBodyVisibleInOutput is explicitly true, source image controls shot size,
+  // crop boundaries, subject scale/placement, and composition while Playboard controls viewpoint & optics.
+  const allowFullBodyExpansion = Boolean(preservation?.requireFullBodyVisibleInOutput);
   const srcAz = source.inferredCamera.azimuthDeg.value;
   const srcEl = source.inferredCamera.elevationDeg.value;
   const srcFl = source.inferredCamera.focalLengthMm.value;
-  const srcShot = source.inferredCamera.shotSize;
+  const srcShotRaw = source.inferredCamera.shotSize;
+  const srcShotLabel = formatSourceShotSizeLabel(srcShotRaw);
   const srcPlace = source.inferredCamera.subjectPlacement;
+  const srcAspectKnown =
+    Boolean(source.observable.aspectRatioDetected) &&
+    source.observable.aspectRatioDetected.toLowerCase() !== 'unknown';
+  const effectiveAspect = srcAspectKnown
+    ? source.observable.aspectRatioDetected
+    : 'Original source aspect ratio';
 
   const deltas: CameraVariableDelta[] = [];
   const changedVariables: string[] = [];
@@ -168,19 +211,32 @@ export function compareSourceAndTarget(
   else unchangedVariables.push('Camera Elevation & Pitch');
 
   // 3. Shot Size / Distance
-  const shotChanged = srcShot.toLowerCase() !== target.shotSize.toLowerCase();
-  deltas.push({
-    variable: 'Shot Size & Distance',
-    sourceValue: `${srcShot} (${source.inferredCamera.distanceLabel}, ${source.inferredCamera.distanceConfidence} confidence)`,
-    targetValue: `${target.shotSize} (${target.distanceMeters}m)`,
-    changed: shotChanged,
-    magnitudeLabel: shotChanged ? `${srcShot} → ${target.shotSize}` : 'Similar framing scale',
-    spatialMeaning: shotChanged
-      ? `Reframe from ${srcShot} to ${target.shotSize} (~${target.distanceMeters}m distance, subject filling ~${target.subjectBounds.heightPct}% of frame height).`
-      : `Maintain ${target.shotSize} framing (~${target.distanceMeters}m distance).`,
-  });
+  const shotChanged = allowFullBodyExpansion
+    ? srcShotLabel.toLowerCase() !== target.shotSize.toLowerCase()
+    : false;
+  if (allowFullBodyExpansion) {
+    deltas.push({
+      variable: 'Shot Size & Distance',
+      sourceValue: `${srcShotLabel} (${source.inferredCamera.distanceLabel}, ${source.inferredCamera.distanceConfidence} confidence)`,
+      targetValue: `${target.shotSize} (${target.distanceMeters}m · full-body requested)`,
+      changed: shotChanged,
+      magnitudeLabel: shotChanged ? `${srcShotLabel} → ${target.shotSize}` : 'Similar framing scale',
+      spatialMeaning: shotChanged
+        ? `Explicitly expand framing from ${srcShotLabel} to ${target.shotSize} (~${target.distanceMeters}m distance, subject filling ~${target.subjectBounds.heightPct}% of frame height) as requested.`
+        : `Maintain ${target.shotSize} framing (~${target.distanceMeters}m distance).`,
+    });
+  } else {
+    deltas.push({
+      variable: 'Shot Size & Framing Extent',
+      sourceValue: `${srcShotLabel} (${source.observable.framingDescription})`,
+      targetValue: `Preserved ${srcShotLabel} (source-controlled crop)`,
+      changed: false,
+      magnitudeLabel: `Preserved (${srcShotLabel})`,
+      spatialMeaning: `Preserve the primary image's ${srcShotLabel} framing, headroom, and visible body extent (${source.observable.framingDescription}). Use the Playboard camera distance (${target.distanceMeters}m) solely for perspective parallax—do NOT pull back or change shot size.`,
+    });
+  }
   if (shotChanged) changedVariables.push('Shot Size & Distance');
-  else unchangedVariables.push('Shot Size & Distance');
+  else unchangedVariables.push('Shot Size & Framing Extent');
 
   // 4. Focal Length / Perspective
   const flDiff = srcFl !== null ? target.focalLengthMm - srcFl : null;
@@ -198,7 +254,7 @@ export function compareSourceAndTarget(
         ? `${flDiff > 0 ? 'Narrower/telephoto' : 'Wider'} (${flDiff > 0 ? '+' : ''}${Math.round(flDiff)}mm)`
         : 'Comparable lens perspective',
     spatialMeaning: flChanged
-      ? `Render with ${target.focalLengthMm}mm equivalent optics (${target.fovDeg}° vFOV, ${target.lensCategoryLabel}).`
+      ? `Render with ${target.focalLengthMm}mm equivalent optics (${target.fovDeg}° vFOV, ${target.lensCategoryLabel}) within the preserved framing.`
       : `Preserve natural ${target.focalLengthMm}mm optical perspective.`,
   });
   if (flChanged) changedVariables.push('Focal Length & Perspective');
@@ -206,33 +262,57 @@ export function compareSourceAndTarget(
 
   // 5. Roll & Framing Placement
   const rollChanged = Math.abs(target.rollDeg) >= 2;
-  deltas.push({
-    variable: 'Framing Placement & Roll',
-    sourceValue: `${source.observable.aspectRatioDetected} · ${srcPlace}`,
-    targetValue: `${target.aspectRatio} · ${target.subjectBounds.placementLabel} · Roll ${target.rollDeg}°`,
-    changed: rollChanged || srcPlace.toLowerCase() !== target.subjectBounds.placementLabel.toLowerCase(),
-    magnitudeLabel: rollChanged ? `Dutch roll ${target.rollDeg}°` : 'Updated frame composition',
-    spatialMeaning: `Output ${target.aspectRatio} aspect ratio with subject ${target.subjectBounds.placementLabel.toLowerCase()} and ${target.rollDeg}° camera roll.`,
-  });
+  if (allowFullBodyExpansion) {
+    deltas.push({
+      variable: 'Framing Placement & Roll',
+      sourceValue: `${source.observable.aspectRatioDetected} · ${srcPlace}`,
+      targetValue: `${target.aspectRatio} · ${target.subjectBounds.placementLabel} · Roll ${target.rollDeg}°`,
+      changed: rollChanged || srcPlace.toLowerCase() !== target.subjectBounds.placementLabel.toLowerCase(),
+      magnitudeLabel: rollChanged ? `Dutch roll ${target.rollDeg}°` : 'Updated frame composition',
+      spatialMeaning: `Output ${target.aspectRatio} aspect ratio with subject ${target.subjectBounds.placementLabel.toLowerCase()} and ${target.rollDeg}° camera roll.`,
+    });
+  } else {
+    deltas.push({
+      variable: 'Framing Placement & Roll',
+      sourceValue: `${source.observable.aspectRatioDetected} · ${srcPlace}`,
+      targetValue: `${effectiveAspect} · ${srcPlace} · Roll ${target.rollDeg}°`,
+      changed: rollChanged,
+      magnitudeLabel: rollChanged
+        ? `Dutch roll ${target.rollDeg}° (framing preserved)`
+        : 'Preserved source framing & placement',
+      spatialMeaning: `Preserve the original ${effectiveAspect} composition, ${srcPlace.toLowerCase()} subject placement, and original crop margins while applying ${target.rollDeg}° camera roll.`,
+    });
+    if (!rollChanged) {
+      unchangedVariables.push('Framing Placement & Aspect Ratio');
+    }
+  }
 
   if (azChanged && elChanged) {
     coupledVisualEffects.push(
-      'Simultaneous horizontal orbit and vertical elevation shift alters background perspective lines, horizon placement, and visible floor/ceiling ratio.'
+      'Simultaneous horizontal orbit and vertical elevation shift alters background perspective lines and horizon placement.'
     );
   }
   if (flChanged && shotChanged) {
     coupledVisualEffects.push(
       'Adjusted distance and focal length jointly govern facial foreshortening and background compression.'
     );
+  } else if (flChanged && !allowFullBodyExpansion) {
+    coupledVisualEffects.push(
+      'Adjusted focal length governs facial foreshortening and background depth compression while keeping the original shot size and crop fixed.'
+    );
   }
   if (Math.abs(target.azimuthDeg) > 65 || (azDiff !== null && Math.abs(azDiff) > 55)) {
     hiddenDetailImplications.push(
-      `Significant horizontal orbit (${target.azimuthDeg}°) reveals side/back regions of the subject and environment that are occluded in the source image.`
+      allowFullBodyExpansion
+        ? `Significant horizontal orbit (${target.azimuthDeg}°) reveals side/back regions of the subject and environment that are occluded in the source image.`
+        : `Significant horizontal orbit (${target.azimuthDeg}°) reveals side/back regions of the visible subject and adjacent room within the preserved ${srcShotLabel} crop.`
     );
   }
   if (target.elevationDeg >= 25) {
     hiddenDetailImplications.push(
-      `High elevation (+${target.elevationDeg}°) exposes the top of the head, shoulder tops, and surrounding floor surface.`
+      allowFullBodyExpansion
+        ? `High elevation (+${target.elevationDeg}°) exposes the top of the head, shoulder tops, and surrounding floor surface.`
+        : `High elevation (+${target.elevationDeg}°) exposes upper surfaces within the preserved ${srcShotLabel} crop (crown of head, shoulder tops, upper background plane) without zooming out to reveal cropped-out lower body parts.`
     );
   }
   if (source.occlusionNotes.length > 0) {

@@ -1,6 +1,9 @@
 import type { TargetModelType } from '../../types';
 import { exportPromptForModel } from '../promptBuilder';
-import { compareSourceAndTarget } from './comparisonAndValidation';
+import {
+  compareSourceAndTarget,
+  formatSourceShotSizeLabel,
+} from './comparisonAndValidation';
 import type {
   CompiledPerspectivePrompt,
   LockedCameraFrame,
@@ -59,13 +62,34 @@ export function compilePerspectivePrompt(params: {
   const { lockedFrame, sourceAnalysis, preservation, targetModel } = params;
   const cam = lockedFrame.cameraState;
   const mode = sourceAnalysis ? 'image_aware' : 'camera_first';
-  const comparison = compareSourceAndTarget(cam, sourceAnalysis);
+  const comparison = compareSourceAndTarget(cam, sourceAnalysis, preservation);
+
+  const isImageAwareFramingLocked =
+    mode === 'image_aware' && !preservation.requireFullBodyVisibleInOutput;
+  const sourceShotLabel = sourceAnalysis
+    ? formatSourceShotSizeLabel(sourceAnalysis.inferredCamera.shotSize)
+    : '';
+  const sourceAspectRaw = sourceAnalysis?.observable.aspectRatioDetected?.trim() || '';
+  const sourceAspectKnown =
+    Boolean(sourceAspectRaw) && sourceAspectRaw.toLowerCase() !== 'unknown';
+  const effectiveSourceAspect = sourceAspectKnown
+    ? sourceAspectRaw
+    : "original primary image's aspect ratio";
+  const sourceScaleSuffix =
+    sourceAnalysis?.inferredCamera.subjectScalePct !== null &&
+    sourceAnalysis?.inferredCamera.subjectScalePct !== undefined
+      ? ` (~${sourceAnalysis.inferredCamera.subjectScalePct}% frame height)`
+      : '';
 
   // 1. TASK OBJECTIVE
-  const taskObjective =
-    mode === 'image_aware'
-      ? `Re-photograph the attached primary image as an exact same-instant, controlled camera-perspective transformation. Treat the primary image as the absolute source of truth for the subject, pose, wardrobe, lighting, and environment—move ONLY the virtual camera to the target perspective (${cam.azimuthLabel}, ${cam.elevationLabel}, ${cam.shotSize}) without redesigning the scene or rotating the subject.`
-      : `Re-photograph the attached primary image from a new target camera perspective (${cam.azimuthLabel}, ${cam.elevationLabel}, ${cam.shotSize}). Treat the supplied primary image as the absolute visual source of truth—preserve the scene and frozen moment while relocating ONLY the camera to the specified target viewpoint.`;
+  let taskObjective: string;
+  if (mode === 'camera_first') {
+    taskObjective = `Re-photograph the attached primary image from a new target camera perspective (${cam.azimuthLabel}, ${cam.elevationLabel}, ${cam.shotSize}). Treat the supplied primary image as the absolute visual source of truth—preserve the scene and frozen moment while relocating ONLY the camera to the specified target viewpoint.`;
+  } else if (isImageAwareFramingLocked) {
+    taskObjective = `Re-photograph the attached primary image as an exact same-instant, controlled camera-perspective transformation. Treat the primary image as the absolute source of truth for the subject, pose, wardrobe, lighting, environment, and original ${sourceShotLabel} framing/crop boundaries—move ONLY the virtual camera to the target perspective (${cam.azimuthLabel}, ${cam.elevationLabel}, ${cam.focalLengthMm}mm lens) while preserving the source photograph's shot size, subject scale, and composition (do NOT expand or convert the framing into a different shot size).`;
+  } else {
+    taskObjective = `Re-photograph the attached primary image as an exact same-instant, controlled camera-perspective transformation. Treat the primary image as the absolute source of truth for the subject, pose, wardrobe, lighting, and environment—move ONLY the virtual camera to the target perspective (${cam.azimuthLabel}, ${cam.elevationLabel}, ${cam.shotSize} with full-body visibility explicitly requested) without redesigning the scene or rotating the subject.`;
+  }
 
   // 2. SOURCE IMAGE UNDERSTANDING
   const sourceImageUnderstanding = sourceAnalysis
@@ -77,7 +101,14 @@ export function compilePerspectivePrompt(params: {
         `- Clothing & accessories: ${sourceAnalysis.observable.clothingAndAccessories}`,
         `- Environment & background: ${sourceAnalysis.observable.environmentAndBackground}`,
         `- Lighting & shadows: ${sourceAnalysis.observable.lightingAndShadows}`,
-        `- Original image framing: ${sourceAnalysis.observable.aspectRatioDetected} (${sourceAnalysis.observable.framingDescription})`,
+        isImageAwareFramingLocked
+          ? `- Original image framing & aspect ratio (CONTROLS OUTPUT FRAMING): ${sourceAnalysis.observable.aspectRatioDetected} (${sourceAnalysis.observable.framingDescription})`
+          : `- Original image framing: ${sourceAnalysis.observable.aspectRatioDetected} (${sourceAnalysis.observable.framingDescription}) — user explicitly requested expanding framing to full-body visibility`,
+        ...(isImageAwareFramingLocked
+          ? [
+              `- Original shot size & crop extent (CONTROLS OUTPUT SHOT SIZE): ${sourceShotLabel}, placement "${sourceAnalysis.inferredCamera.subjectPlacement}"${sourceScaleSuffix} — keep these exact crop limits, headroom, and visible body extent in the output.`,
+            ]
+          : []),
       ].join('\n')
     : `No pre-scan analysis was attached inside Whiskai (Camera-First Mode). Inspect the attached primary image directly to read the subject's identity, exact frozen pose, body orientation, gaze direction, wardrobe, lighting direction, and surrounding environment before applying the camera transformation below.`;
 
@@ -102,9 +133,10 @@ export function compilePerspectivePrompt(params: {
       `Estimated starting viewpoint inferred from 2D visual cues (these are approximate estimates, not physical measurements):`,
       `- Original azimuth: ${azText}`,
       `- Original elevation: ${elText}`,
-      `- Approximate distance & shot size: ${inf.shotSize} at ${inf.distanceLabel} distance (${inf.distanceConfidence} confidence)`,
+      `- Approximate distance & shot size: ${sourceShotLabel} at ${inf.distanceLabel} distance (${inf.distanceConfidence} confidence)`,
       `- Lens / perspective character: ${flText}`,
-      `- Source subject placement: ${inf.subjectPlacement}`,
+      `- Source subject placement: ${inf.subjectPlacement}${sourceScaleSuffix}`,
+      `- Framing & crop baseline: ${sourceAnalysis.observable.aspectRatioDetected} · ${sourceAnalysis.observable.framingDescription}`,
       `- Summary: ${inf.summary}`,
     ].join('\n');
   } else {
@@ -112,25 +144,37 @@ export function compilePerspectivePrompt(params: {
   }
 
   // 4. TARGET CAMERA PERSPECTIVE
-  const visiblePartsText =
-    cam.subjectBounds.visibleLandmarks.length > 0
-      ? cam.subjectBounds.visibleLandmarks.join(', ')
-      : 'subject center';
-  const croppedNote =
-    cam.subjectBounds.croppedEdges.length > 0
-      ? `Natural frame crop edges: ${cam.subjectBounds.croppedEdges.join(', ')}.`
-      : 'Entire target composition sits cleanly inside the frame borders.';
+  let targetCameraPerspective: string;
+  if (mode === 'camera_first' || !isImageAwareFramingLocked) {
+    const visiblePartsText =
+      cam.subjectBounds.visibleLandmarks.length > 0
+        ? cam.subjectBounds.visibleLandmarks.join(', ')
+        : 'subject center';
+    const croppedNote =
+      cam.subjectBounds.croppedEdges.length > 0
+        ? `Natural frame crop edges: ${cam.subjectBounds.croppedEdges.join(', ')}.`
+        : 'Entire target composition sits cleanly inside the frame borders.';
 
-  const targetCameraPerspective = [
-    `Locked 3D Playboard Target Configuration (captured at ${new Date(lockedFrame.lockedAt).toISOString()}):`,
-    `- Viewing direction (Azimuth): ${cam.azimuthLabel} at ${cam.azimuthDeg}° — camera sits ${describeOrbitSpatialMotion(cam.azimuthDeg)}.`,
-    `- Camera height & tilt (Elevation / Pitch): ${cam.elevationLabel} — camera is ${describeElevationSpatialMeaning(cam.elevationDeg, cam.pitchDeg)}.`,
-    `- Camera-to-target distance: ${cam.distanceMeters}m from look-at target (${cam.targetPosition.x}m, ${cam.targetPosition.y}m, ${cam.targetPosition.z}m); camera world coordinates (${cam.worldPosition.x}m, ${cam.worldPosition.y}m, ${cam.worldPosition.z}m) with subject anchored at origin (0, 0, 0) facing +Z.`,
-    `- Shot size & scale: ${cam.shotSize} — subject spans ~${cam.subjectBounds.heightPct}% of frame height (${cam.subjectBounds.widthPct}% width); key body landmarks in frame: ${visiblePartsText}.`,
-    `- Frame placement & aspect ratio: ${cam.aspectRatio} aspect ratio (${cam.viewportDimensions.width}×${cam.viewportDimensions.height} viewport), subject ${cam.subjectBounds.placementLabel.toLowerCase()} (normalized center x=${cam.subjectBounds.centerNdcX}, y=${cam.subjectBounds.centerNdcY}). ${croppedNote}`,
-    `- Optical lens & projection: ${cam.focalLengthMm}mm full-frame equivalent (${cam.fovDeg}° vertical FOV, ${cam.lensCategoryLabel}, ${cam.projectionType} projection).`,
-    `- Camera roll: ${describeRollVisualMeaning(cam.rollDeg)}.`,
-  ].join('\n');
+    targetCameraPerspective = [
+      `Locked 3D Playboard Target Configuration (captured at ${new Date(lockedFrame.lockedAt).toISOString()}):`,
+      `- Viewing direction (Azimuth): ${cam.azimuthLabel} at ${cam.azimuthDeg}° — camera sits ${describeOrbitSpatialMotion(cam.azimuthDeg)}.`,
+      `- Camera height & tilt (Elevation / Pitch): ${cam.elevationLabel} — camera is ${describeElevationSpatialMeaning(cam.elevationDeg, cam.pitchDeg)}.`,
+      `- Camera-to-target distance: ${cam.distanceMeters}m from look-at target (${cam.targetPosition.x}m, ${cam.targetPosition.y}m, ${cam.targetPosition.z}m); camera world coordinates (${cam.worldPosition.x}m, ${cam.worldPosition.y}m, ${cam.worldPosition.z}m) with subject anchored at origin (0, 0, 0) facing +Z.`,
+      `- Shot size & scale: ${cam.shotSize} — subject spans ~${cam.subjectBounds.heightPct}% of frame height (${cam.subjectBounds.widthPct}% width); key body landmarks in frame: ${visiblePartsText}.`,
+      `- Frame placement & aspect ratio: ${cam.aspectRatio} aspect ratio (${cam.viewportDimensions.width}×${cam.viewportDimensions.height} viewport), subject ${cam.subjectBounds.placementLabel.toLowerCase()} (normalized center x=${cam.subjectBounds.centerNdcX}, y=${cam.subjectBounds.centerNdcY}). ${croppedNote}`,
+      `- Optical lens & projection: ${cam.focalLengthMm}mm full-frame equivalent (${cam.fovDeg}° vertical FOV, ${cam.lensCategoryLabel}, ${cam.projectionType} projection).`,
+      `- Camera roll: ${describeRollVisualMeaning(cam.rollDeg)}.`,
+    ].join('\n');
+  } else {
+    targetCameraPerspective = [
+      `Locked 3D Playboard Target Camera Perspective (captured at ${new Date(lockedFrame.lockedAt).toISOString()}; Playboard defines camera viewpoint & optics ONLY, while the primary image controls output framing):`,
+      `- Viewing direction (Azimuth): ${cam.azimuthLabel} at ${cam.azimuthDeg}° — camera sits ${describeOrbitSpatialMotion(cam.azimuthDeg)}.`,
+      `- Camera height & tilt (Elevation / Pitch): ${cam.elevationLabel} — camera is ${describeElevationSpatialMeaning(cam.elevationDeg, cam.pitchDeg)}.`,
+      `- Optical lens & perspective projection: ${cam.focalLengthMm}mm full-frame equivalent (${cam.fovDeg}° vertical FOV, ${cam.lensCategoryLabel}, ${cam.projectionType} projection) at ~${cam.distanceMeters}m rig distance (parallax reference only—do NOT zoom out to alter shot size).`,
+      `- Camera roll: ${describeRollVisualMeaning(cam.rollDeg)}.`,
+      `- Preserved Output Framing (controlled by primary image): retain the source image's ${sourceShotLabel} shot size (${sourceAnalysis!.observable.framingDescription}), ${sourceAnalysis!.inferredCamera.subjectPlacement.toLowerCase()} subject placement${sourceScaleSuffix}, original headroom/crop boundaries, and ${effectiveSourceAspect} composition. Do NOT let the virtual reference rig force a wider or full-body shot.`,
+    ].join('\n');
+  }
 
   // 5. REQUIRED CAMERA TRANSFORMATION
   const transformLines = comparison.deltas.map(
@@ -141,11 +185,17 @@ export function compilePerspectivePrompt(params: {
       ...comparison.coupledVisualEffects.map((e) => `- Spatial perspective coupling: ${e}`)
     );
   }
-  const requiredCameraTransformation = [
+  const requiredCameraTransformationLines = [
     `Execute the following camera relocation around the stationary subject:`,
     ...transformLines,
     `- CRITICAL SEPARATION: Move ONLY the camera in 3D space. The subject MUST NOT turn their body, rotate their feet, turn their head, or alter their posture to follow or face the new camera.`,
-  ].join('\n');
+  ];
+  if (isImageAwareFramingLocked) {
+    requiredCameraTransformationLines.push(
+      `- FRAMING & CROP LOCK: Keep the output framed strictly as the primary image's ${sourceShotLabel} (${sourceAnalysis!.observable.framingDescription}). Shifting azimuth, elevation, or focal perspective must NOT pull the camera back to reveal out-of-frame lower body regions.`
+    );
+  }
+  const requiredCameraTransformation = requiredCameraTransformationLines.join('\n');
 
   // 6. ELEMENTS THAT MUST REMAIN UNCHANGED
   const preservedList: string[] = [];
@@ -177,6 +227,11 @@ export function compilePerspectivePrompt(params: {
   if (preservation.preserveColorsAndTextures) {
     preservedList.push('Material finishes, fabric weaves, surface textures, and color palette');
   }
+  if (isImageAwareFramingLocked) {
+    preservedList.push(
+      `Original ${sourceShotLabel} shot size, visible body extent (${sourceAnalysis!.observable.framingDescription}), ${sourceAnalysis!.inferredCamera.subjectPlacement.toLowerCase()} placement${sourceScaleSuffix}, headroom, and ${effectiveSourceAspect} crop boundaries`
+    );
+  }
   if (preservation.additionalUserNotes.trim()) {
     preservedList.push(`User instruction note: ${preservation.additionalUserNotes.trim()}`);
   }
@@ -187,25 +242,50 @@ export function compilePerspectivePrompt(params: {
       : '- Preserve core subject identity and scene continuity where compatible with the requested camera change.';
 
   // 7. VISUAL CONSISTENCY REQUIREMENTS
-  const visualConsistencyRequirements = [
+  const visualConsistencyLines = [
     `- Keep the primary image as the visual ground truth; this is a re-shot photograph from a simultaneous camera, never a stylized redesign.`,
     `- Maintain coherent 3D perspective geometry across floor planes, walls, and subject foreshortening matching a ${cam.focalLengthMm}mm lens at ${cam.elevationDeg}° elevation.`,
     `- Keep light direction and cast shadow angles locked to the original environment world space—only their apparent screen-space angle changes as the camera orbits to ${cam.azimuthDeg}°.`,
     `- Keep depth of field, photographic grain, and natural texture sharpness consistent with the primary photograph.`,
-  ].join('\n');
+  ];
+  if (isImageAwareFramingLocked) {
+    visualConsistencyLines.push(
+      `- Maintain the primary photograph's relative subject-to-frame scale, crop edges, and margin proportions while shifting to the ${cam.azimuthDeg}° azimuth / ${cam.elevationDeg}° elevation camera viewpoint.`
+    );
+  }
+  const visualConsistencyRequirements = visualConsistencyLines.join('\n');
 
   // 8. HANDLING OF PREVIOUSLY HIDDEN OR UNSEEN DETAILS
-  const hiddenLines = [
-    ...comparison.hiddenDetailImplications.map((h) => `- ${h}`),
-    `- When the camera angle reveals surfaces occluded in the primary image (e.g., side profile, rear clothing/hair, back walls, or floor beneath the subject), synthesize only plausible continuations of the existing garments, body anatomy, and room design without inventing unrequested props or altering visible design motifs.`,
-  ];
+  const hiddenLines = isImageAwareFramingLocked
+    ? [
+        ...comparison.hiddenDetailImplications.map((h) => `- ${h}`),
+        `- When the new camera angle reveals surfaces occluded within the preserved frame (e.g., side profile, ear/hair side, shoulder/collar continuation, or adjacent background wall), synthesize only plausible continuations of the existing garments, anatomy, and room design without inventing unrequested props.`,
+        `- Strictly maintain the original framing boundaries (${sourceShotLabel}; ${sourceAnalysis!.observable.framingDescription}): do NOT zoom out, uncrop, or reconstruct out-of-frame lower body anatomy, legs, or feet beyond the primary image's established crop.`,
+      ]
+    : [
+        ...comparison.hiddenDetailImplications.map((h) => `- ${h}`),
+        `- When the camera angle reveals surfaces occluded in the primary image (e.g., side profile, rear clothing/hair, back walls, or floor beneath the subject), synthesize only plausible continuations of the existing garments, body anatomy, and room design without inventing unrequested props or altering visible design motifs.`,
+      ];
   const hiddenOrUnseenDetails = hiddenLines.join('\n');
 
   // 9. FINAL OUTPUT REQUIREMENTS
-  const finalOutputRequirements = [
-    `- Output a single, clean ${cam.aspectRatio} photograph framed as a ${cam.shotSize} from the locked target camera (${cam.azimuthDeg}° azimuth, ${cam.elevationDeg}° elevation, ${cam.distanceMeters}m distance, ${cam.focalLengthMm}mm lens, ${cam.rollDeg}° roll).`,
-    `- Ensure zero extra people, zero duplicated limbs, zero scene restyling, and zero UI overlays or borders.`,
-  ].join('\n');
+  let finalOutputRequirements: string;
+  if (mode === 'camera_first') {
+    finalOutputRequirements = [
+      `- Output a single, clean ${cam.aspectRatio} photograph framed as a ${cam.shotSize} from the locked target camera (${cam.azimuthDeg}° azimuth, ${cam.elevationDeg}° elevation, ${cam.distanceMeters}m distance, ${cam.focalLengthMm}mm lens, ${cam.rollDeg}° roll).`,
+      `- Ensure zero extra people, zero duplicated limbs, zero scene restyling, and zero UI overlays or borders.`,
+    ].join('\n');
+  } else if (isImageAwareFramingLocked) {
+    finalOutputRequirements = [
+      `- Output a single, clean photograph in the ${effectiveSourceAspect} preserving the primary image's ${sourceShotLabel} framing (${sourceAnalysis!.observable.framingDescription}, ${sourceAnalysis!.inferredCamera.subjectPlacement.toLowerCase()} placement${sourceScaleSuffix}), viewed from the target camera perspective (${cam.azimuthDeg}° azimuth, ${cam.elevationDeg}° elevation, ${cam.focalLengthMm}mm lens, ${cam.rollDeg}° roll).`,
+      `- Ensure zero extra people, zero duplicated limbs, zero unrequested expansion beyond the source crop boundaries, zero scene restyling, and zero UI overlays or borders.`,
+    ].join('\n');
+  } else {
+    finalOutputRequirements = [
+      `- Output a single, clean ${cam.aspectRatio} photograph framed as a ${cam.shotSize} with full-body visibility explicitly enabled, from the locked target camera (${cam.azimuthDeg}° azimuth, ${cam.elevationDeg}° elevation, ${cam.distanceMeters}m distance, ${cam.focalLengthMm}mm lens, ${cam.rollDeg}° roll).`,
+      `- Ensure zero extra people, zero duplicated limbs, zero scene restyling, and zero UI overlays or borders.`,
+    ].join('\n');
+  }
 
   const sections = {
     taskObjective,
@@ -231,7 +311,11 @@ export function compilePerspectivePrompt(params: {
     `9. FINAL OUTPUT REQUIREMENTS\n${sections.finalOutputRequirements}`,
   ].join('\n\n');
 
-  const exportedText = exportPromptForModel(fullText, targetModel, cam.aspectRatio);
+  const sourceAspectRatioMatch = isImageAwareFramingLocked
+    ? sourceAspectRaw.match(/\b(\d+:\d+)\b/)
+    : null;
+  const exportAspectRatio = sourceAspectRatioMatch ? sourceAspectRatioMatch[1] : cam.aspectRatio;
+  const exportedText = exportPromptForModel(fullText, targetModel, exportAspectRatio);
 
   return {
     mode,

@@ -40,7 +40,10 @@ import {
   DEFAULT_CAMERA_CONFIG,
 } from '../../services/perspectivePlayboard/cameraController';
 import { analyzePrimarySourceImage } from '../../services/perspectivePlayboard/sourceImageAnalysis';
-import { validateTransformationConsistency } from '../../services/perspectivePlayboard/comparisonAndValidation';
+import {
+  formatSourceShotSizeLabel,
+  validateTransformationConsistency,
+} from '../../services/perspectivePlayboard/comparisonAndValidation';
 import { compilePerspectivePrompt } from '../../services/perspectivePlayboard/promptCompiler';
 import {
   PlayboardViewport,
@@ -1350,6 +1353,19 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
                         </p>
                       );
                     }
+                    const preserveSourceFraming =
+                      Boolean(sourceAnalysis) && !preservation.requireFullBodyVisibleInOutput;
+                    const displayedShotSize = preserveSourceFraming
+                      ? `Preserved (${formatSourceShotSizeLabel(
+                          sourceAnalysis!.inferredCamera.shotSize
+                        )})`
+                      : targetCam.shotSize;
+                    const displayedAspect =
+                      preserveSourceFraming &&
+                      sourceAnalysis?.observable.aspectRatioDetected &&
+                      sourceAnalysis.observable.aspectRatioDetected.toLowerCase() !== 'unknown'
+                        ? sourceAnalysis.observable.aspectRatioDetected
+                        : targetCam.aspectRatio;
                     return (
                       <div className="space-y-1.5 text-zinc-100 font-mono tabular-nums">
                         <div>
@@ -1362,9 +1378,9 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
                           Distance / Lens: {targetCam.distanceMeters}m ·{' '}
                           {targetCam.focalLengthMm}mm ({targetCam.fovDeg}° FOV)
                         </div>
-                        <div>Shot Size: {targetCam.shotSize}</div>
+                        <div>Shot Size: {displayedShotSize}</div>
                         <div>
-                          Aspect Ratio: {targetCam.aspectRatio} · Roll {targetCam.rollDeg}°
+                          Aspect Ratio: {displayedAspect} · Roll {targetCam.rollDeg}°
                         </div>
                       </div>
                     );
