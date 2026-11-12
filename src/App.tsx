@@ -50,6 +50,7 @@ import { ReferenceViewfinder } from './components/ReferenceViewfinder';
 import { FloatingPromptDock } from './components/FloatingPromptDock';
 import { SwapStudio } from './components/SwapStudio';
 import { CameraAI } from './components/CameraAI';
+import { PerspectivePlayboard } from './components/perspectivePlayboard/PerspectivePlayboard';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Wrench,
@@ -85,6 +86,7 @@ import {
   User,
   ListChecks,
   Bug,
+  Compass,
 } from 'lucide-react';
 
 function checkIsCameraRoute(): { isCameraRoute: boolean; mode: 'playboard' | 'extractor' } {
@@ -1642,6 +1644,13 @@ export default function App() {
       setActiveTool(blueprint.toolType);
       StorageService.setActiveTool(blueprint.toolType);
     }
+    if (blueprint.toolType === 'perspective_playboard') {
+      setOutputRatio(blueprint.outputRatio || '3:4');
+      setProjectTitleInput(blueprint.title || '');
+      setTargetModel(blueprint.targetModel || 'universal');
+      setActiveNav('tools');
+      return;
+    }
     if (blueprint.components && Object.keys(blueprint.components).length > 0) {
       setComponents(blueprint.components);
       setOriginalComponents(blueprint.originalComponents || blueprint.components);
@@ -1946,7 +1955,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 {(
                   [
                     {
@@ -1976,6 +1985,13 @@ export default function App() {
                       title: '4. Camera AI',
                       desc: "Extract any image's camera position & lens framing. Re-shoot your own image from that exact position.",
                       icon: Sliders,
+                    },
+                    {
+                      id: 'perspective_playboard',
+                      num: '05',
+                      title: '5. 3D Perspective Playboard',
+                      desc: 'Orbit a virtual camera around a fixed 3D subject, lock the frame, and compile a 9-section I2I camera prompt.',
+                      icon: Compass,
                     },
                   ] as const
                 ).map((tool) => {
@@ -2099,6 +2115,11 @@ export default function App() {
               />
             ) : (activeTool as string) === 'camera_ai' ? (
               <CameraAI
+                optimizeImageFile={optimizeImageFile}
+                onOpenProjects={() => setActiveNav('projects')}
+              />
+            ) : (activeTool as string) === 'perspective_playboard' ? (
+              <PerspectivePlayboard
                 optimizeImageFile={optimizeImageFile}
                 onOpenProjects={() => setActiveNav('projects')}
               />

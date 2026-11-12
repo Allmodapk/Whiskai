@@ -99,7 +99,8 @@ export type ToolType =
   | 'general_extractor'
   | 'subject_swapping'
   | 'camera_controller'
-  | 'camera_ai';
+  | 'camera_ai'
+  | 'perspective_playboard';
 
 export interface CameraControlSettings {
   viewpoint: string; // e.g., Front-facing view, Three-quarter view, Side profile, Rear view

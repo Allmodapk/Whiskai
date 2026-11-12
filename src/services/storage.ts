@@ -226,7 +226,8 @@ export const StorageService = {
         val === 'general_extractor' ||
         val === 'subject_swapping' ||
         val === 'camera_controller' ||
-        val === 'camera_ai'
+        val === 'camera_ai' ||
+        val === 'perspective_playboard'
       ) {
         return val;
       }

@@ -25,6 +25,7 @@ const TOOL_LABELS: Record<ToolType, string> = {
   subject_swapping: 'Subject Swapping',
   camera_controller: 'Camera Angle Controller',
   camera_ai: 'Camera AI',
+  perspective_playboard: '3D Camera Perspective Playboard',
 };
 
 export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlueprint }) => {
