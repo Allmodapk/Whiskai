@@ -423,7 +423,7 @@ export const LockAdvisor: React.FC<LockAdvisorProps> = ({ optimizeImageFile }) =
       const res = await postApiJson<{ success: boolean; decision: LockDecision }>(
         '/api/lock-advisor/analyze',
         payload,
-        { customKey, timeoutMs: 32000, maxRetries: 0 }
+        { customKey, timeoutMs: 48000, maxRetries: 0 }
       );
 
       if (!res?.decision) {

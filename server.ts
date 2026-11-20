@@ -929,9 +929,11 @@ async function generateWithFallback(
 
       try {
         const config: Record<string, any> = {
-          temperature: 0.2,
           maxOutputTokens: 8192,
         };
+        if (!modelConfig.name.startsWith('gemini-4-')) {
+          config.temperature = 0.2;
+        }
         if (options?.systemInstruction) {
           config.systemInstruction = options.systemInstruction;
         }
@@ -2860,11 +2862,12 @@ app.post('/api/lock-advisor/analyze', async (req, res) => {
     const { parsed, text } = await generateWithFallback(ai, parts, true, customKey, {
       systemInstruction: LOCK_ADVISOR_SYSTEM_INSTRUCTION,
       models: [
-        { name: 'gemini-3.8-flash', timeoutMs: 24000, thinkingLevel: ThinkingLevel.HIGH },
+        { name: 'gemini-4-hydrogen', timeoutMs: 20000, thinkingLevel: ThinkingLevel.LOW },
         { name: 'gemini-3.1-flash-lite', timeoutMs: 18000, thinkingLevel: ThinkingLevel.LOW },
+        { name: 'gemini-flash-latest', timeoutMs: 15000 },
       ],
-      maxTotalBudgetMs: 27000,
-      httpTimeoutMs: 25000,
+      maxTotalBudgetMs: 42000,
+      httpTimeoutMs: 22000,
     });
 
     const rawDecision = parsed ?? parseModelJson(text);
