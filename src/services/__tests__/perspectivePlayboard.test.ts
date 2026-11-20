@@ -593,4 +593,213 @@ function createTestSnapshot(opts: {
   console.log('✓ Scenario I passed: Image-Aware preserves Chest-Up, Waist-Up, Medium, Full-Body source framing and respects explicit full-body opt-in');
 }
 
+// ---------------------------------------------------------------------------
+// Scenario J: Local Fallback Honesty — Never Masquerades Fallback Estimates as Gemini Facts
+// ---------------------------------------------------------------------------
+{
+  const serverFallbackPayload: CameraAiBaseAnalysis = {
+    subject_type_and_count: 'Single human subject',
+    pose: 'Standing upright in a relaxed stance with weight evenly distributed and arms hanging naturally',
+    head_orientation: 'Head turned forward toward the camera lens',
+    gaze_direction: 'Looking directly into Camera B lens at eye level',
+    clothing_details: 'Well-fitted contemporary wardrobe with natural fabric texture',
+    environment_and_background: 'Clean interior studio space with subtle ambient background details',
+    lighting_details: 'Soft directional key lighting from front-left with gentle fill and realistic shadows',
+    current_camera: {
+      pitch_deg: -5,
+      pitch_range: [-15, 5],
+      pitch_confidence: 0.85,
+      pitch_label: 'level / eye-level',
+      camera_height: 'eye level',
+      camera_height_meters: 1.6,
+      camera_height_confidence: 0.85,
+      azimuth_deg: 0,
+      azimuth_range: [-15, 15],
+      azimuth_confidence: 0.85,
+      azimuth_reference_axis: 'Subject facing direction',
+      distance_label: 'medium',
+      distance_meters: 2.5,
+      distance_confidence: 0.85,
+      perspective_strength_rating: 'Standard normal lens perspective',
+      focal_length_mm: 50,
+      focal_length_range: [35, 70],
+      focal_length_label: 'normal',
+      focal_length_confidence: 0.85,
+      distortion_character: 'Minimal distortion',
+      roll_deg: 0,
+      roll_confidence: 0.95,
+      shot_size: 'full',
+      framing: {
+        aspect_ratio: '4:5',
+        orientation: 'Portrait',
+        subject_position_in_frame: 'Center cell',
+        headroom: '15% vertical headroom',
+        lead_room: 'Centered lead room',
+        negative_space: 'Balanced lateral margins',
+        crop_behavior: 'Clean non-cutting frame edges',
+      },
+      depth_of_field: {
+        dof_type: 'medium',
+        focus_plane_position: 'Focused on principal subject plane',
+      },
+      camera_position_summary: 'Eye-level fallback camera',
+    },
+    must_not_change: ['Subject identity'],
+    geometry_risks: ['Fallback risk'],
+  };
+
+  const fallbackAnalysis = mapBaseAnalysisToSourceAnalysis(
+    serverFallbackPayload,
+    'closeup_portrait.jpg',
+    {
+      isFallbackEstimate: true,
+      modelUsed: 'local-optical-blueprint',
+      fallbackReason: 'quota_exhausted',
+      quotaCause: '429 RESOURCE_EXHAUSTED: Free tier daily quota exceeded.',
+      warningMessage: 'Live Gemini quota reached; local fallback estimate used (reduced accuracy).',
+    }
+  );
+
+  assert.equal(fallbackAnalysis.isFallbackEstimate, true);
+  assert.equal(fallbackAnalysis.analysisOrigin, 'local_fallback');
+  assert.equal(fallbackAnalysis.fallbackReason, 'quota_exhausted');
+  assert.equal(fallbackAnalysis.quotaCause, '429 RESOURCE_EXHAUSTED: Free tier daily quota exceeded.');
+  assert.equal(fallbackAnalysis.observable.aspectRatioDetected, '4:5');
+  assert.equal(fallbackAnalysis.inferredCamera.azimuthDeg.value, null);
+  assert.equal(fallbackAnalysis.inferredCamera.azimuthDeg.confidence, 'unknown');
+  assert.equal(fallbackAnalysis.inferredCamera.elevationDeg.value, null);
+  assert.equal(fallbackAnalysis.inferredCamera.elevationDeg.confidence, 'unknown');
+  assert.equal(fallbackAnalysis.inferredCamera.focalLengthMm.value, null);
+  assert.equal(fallbackAnalysis.inferredCamera.focalLengthMm.confidence, 'unknown');
+  assert.equal(fallbackAnalysis.inferredCamera.shotSizeConfidence, 'unknown');
+  assert.ok(!fallbackAnalysis.observable.poseAndOrientation.includes('Standing upright'));
+  assert.ok(!fallbackAnalysis.inferredCamera.shotSize.toLowerCase().includes('full-body'));
+
+  const { snapshot: playboardSnap } = createTestSnapshot({
+    azimuthDeg: -40,
+    elevationDeg: 22,
+    distanceMeters: 4.0,
+    focalLengthMm: 35,
+    rollDeg: 4,
+    aspectRatio: '16:9',
+  });
+  assert.equal(playboardSnap.shotSize, 'Full-Body Shot');
+
+  const fallbackPrompt = compilePerspectivePrompt({
+    lockedFrame: { isLocked: true, lockedAt: 1700000000000, cameraState: playboardSnap },
+    sourceAnalysis: fallbackAnalysis,
+    preservation: BASE_PRESERVATION,
+    targetModel: 'universal',
+  });
+
+  assert.equal(fallbackPrompt.mode, 'image_aware');
+  assert.ok(fallbackPrompt.sections.sourceImageUnderstanding.includes('LOCAL FALLBACK ESTIMATE ACTIVE (NOT Gemini-verified'));
+  assert.ok(fallbackPrompt.sections.sourceImageUnderstanding.includes('429 RESOURCE_EXHAUSTED'));
+  assert.ok(!fallbackPrompt.fullText.includes('Full-Body Shot'), 'Must not leak Playboard or fallback Full-Body Shot');
+  assert.ok(!fallbackPrompt.fullText.includes('Standing upright'), 'Must not leak fabricated fallback pose');
+  assert.ok(fallbackPrompt.sections.originalCameraPerspective.includes('UNVERIFIED local fallback'));
+  assert.ok(fallbackPrompt.sections.targetCameraPerspective.includes('-40°'));
+  assert.ok(fallbackPrompt.sections.targetCameraPerspective.includes('+22°'));
+  assert.ok(fallbackPrompt.sections.targetCameraPerspective.includes('35mm'));
+  assert.ok(fallbackPrompt.sections.finalOutputRequirements.includes('4:5'));
+  assert.ok(fallbackPrompt.sections.finalOutputRequirements.includes('shot size uncertain automatically'));
+
+  // Verify delta comparison does not fabricate fake angle shifts when source values are null
+  const azDelta = fallbackPrompt.comparison.deltas.find((d) => d.variable.startsWith('Horizontal Orbit'));
+  const elDelta = fallbackPrompt.comparison.deltas.find((d) => d.variable.startsWith('Camera Elevation'));
+  assert.ok(azDelta?.sourceValue.includes('Unverified locally'));
+  assert.ok(elDelta?.sourceValue.includes('Unverified locally'));
+  console.log('✓ Scenario J passed: Local fallback suppresses fabricated pose/shot defaults and communicates uncertainty cleanly');
+}
+
+// ---------------------------------------------------------------------------
+// Scenario K: Gemini Verified Metadata & Uncertain Gemini Shot Size Handling
+// ---------------------------------------------------------------------------
+{
+  const geminiUnknownShotPayload: CameraAiBaseAnalysis = {
+    subject_type_and_count: 'Single seated woman',
+    pose: 'Seated on bed edge leaning slightly forward',
+    head_orientation: 'Facing camera',
+    gaze_direction: 'Looking toward lens',
+    clothing_details: 'Taupe crewneck sweatshirt and dark pants',
+    environment_and_background: 'Daylit bedroom with sheer curtains',
+    lighting_details: 'Soft backlit window daylight with gentle room fill',
+    current_camera: {
+      pitch_deg: 2,
+      pitch_range: [-4, 8],
+      pitch_confidence: 0.78,
+      pitch_label: 'eye level',
+      camera_height: 'chest level',
+      camera_height_meters: 1.1,
+      camera_height_confidence: 0.75,
+      azimuth_deg: 0,
+      azimuth_range: [-8, 8],
+      azimuth_confidence: 0.88,
+      azimuth_reference_axis: 'Subject facing axis',
+      distance_label: 'medium',
+      distance_meters: 2.2,
+      distance_confidence: 0.7,
+      perspective_strength_rating: 'Natural 35mm bedroom perspective',
+      focal_length_mm: 35,
+      focal_length_range: [30, 42],
+      focal_length_label: 'wide',
+      focal_length_confidence: 0.74,
+      distortion_character: 'Mild spatial depth',
+      roll_deg: 0,
+      roll_confidence: 0.95,
+      shot_size: 'unknown',
+      framing: {
+        aspect_ratio: '3:4',
+        orientation: 'Portrait',
+        subject_position_in_frame: 'Centered',
+        headroom: '18% headroom',
+        lead_room: 'Balanced',
+        negative_space: 'Clean bedroom margins',
+        crop_behavior: 'Tight crop above ankles',
+      },
+      depth_of_field: {
+        dof_type: 'shallow',
+        focus_plane_position: 'Subject face and torso',
+      },
+      camera_position_summary: 'Slightly low-to-chest front angle',
+    },
+    must_not_change: ['Identity', 'Bedroom window lighting'],
+    geometry_risks: ['Rear side of bedroom occluded'],
+  };
+
+  const verifiedUnknownShot = mapBaseAnalysisToSourceAnalysis(
+    geminiUnknownShotPayload,
+    'bedroom_seated.jpg',
+    {
+      isFallbackEstimate: false,
+      modelUsed: 'gemini-3.8-flash',
+    }
+  );
+
+  assert.equal(verifiedUnknownShot.isFallbackEstimate, false);
+  assert.equal(verifiedUnknownShot.analysisOrigin, 'gemini_verified');
+  assert.equal(verifiedUnknownShot.modelUsed, 'gemini-3.8-flash');
+  assert.equal(verifiedUnknownShot.inferredCamera.shotSizeConfidence, 'unknown');
+
+  const { snapshot: playboardSnap } = createTestSnapshot({
+    azimuthDeg: 55,
+    elevationDeg: 14,
+    distanceMeters: 4.0,
+    focalLengthMm: 35,
+    aspectRatio: '16:9',
+  });
+  const compiled = compilePerspectivePrompt({
+    lockedFrame: { isLocked: true, lockedAt: 1700000000000, cameraState: playboardSnap },
+    sourceAnalysis: verifiedUnknownShot,
+    preservation: BASE_PRESERVATION,
+    targetModel: 'gemini',
+  });
+
+  assert.ok(!compiled.fullText.includes('Full-Body Shot'));
+  assert.ok(compiled.sections.originalCameraPerspective.includes('Uncertain (unknown confidence'));
+  assert.ok(compiled.sections.targetCameraPerspective.includes('preserve the exact source crop, visible body extent'));
+  assert.ok(compiled.sections.sourceImageUnderstanding.includes('Single seated woman'));
+  console.log('✓ Scenario K passed: Gemini-verified analysis preserves honest uncertain shot size without inventing framing');
+}
+
 console.log('All 3D Camera Perspective Playboard tests passed successfully!');

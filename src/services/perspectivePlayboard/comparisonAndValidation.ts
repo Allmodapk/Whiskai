@@ -52,6 +52,18 @@ export function formatSourceShotSizeLabel(rawShotSize: string): string {
   return map[normalized] || trimmed;
 }
 
+export function isShotSizeUncertain(source: SourceImageAnalysis | null): boolean {
+  if (!source) return false;
+  if (source.inferredCamera.shotSizeConfidence === 'unknown') return true;
+  const norm = (source.inferredCamera.shotSize || '').trim().toLowerCase();
+  return (
+    !norm ||
+    norm === 'unknown' ||
+    norm.startsWith('uncertain') ||
+    norm.startsWith('unverified')
+  );
+}
+
 export function compareSourceAndTarget(
   target: CameraStateSnapshot,
   source: SourceImageAnalysis | null,
@@ -141,11 +153,15 @@ export function compareSourceAndTarget(
   // Unless requireFullBodyVisibleInOutput is explicitly true, source image controls shot size,
   // crop boundaries, subject scale/placement, and composition while Playboard controls viewpoint & optics.
   const allowFullBodyExpansion = Boolean(preservation?.requireFullBodyVisibleInOutput);
+  const shotUncertain = isShotSizeUncertain(source);
+  const isUnverifiedFallback = Boolean(source.isFallbackEstimate) && !source.userConfirmedEdits;
   const srcAz = source.inferredCamera.azimuthDeg.value;
   const srcEl = source.inferredCamera.elevationDeg.value;
   const srcFl = source.inferredCamera.focalLengthMm.value;
   const srcShotRaw = source.inferredCamera.shotSize;
-  const srcShotLabel = formatSourceShotSizeLabel(srcShotRaw);
+  const srcShotLabel = shotUncertain
+    ? 'Uncertain Source Shot Size'
+    : formatSourceShotSizeLabel(srcShotRaw);
   const srcPlace = source.inferredCamera.subjectPlacement;
   const srcAspectKnown =
     Boolean(source.observable.aspectRatioDetected) &&
@@ -168,6 +184,8 @@ export function compareSourceAndTarget(
     sourceValue:
       srcAz !== null
         ? `~${srcAz}° (${source.inferredCamera.azimuthDeg.confidence} confidence)`
+        : isUnverifiedFallback
+        ? 'Unverified locally (inspect attached primary image)'
         : 'Uncertain from 2D photo',
     targetValue: `${target.azimuthDeg}° (${target.azimuthLabel})`,
     changed: azChanged,
@@ -176,11 +194,13 @@ export function compareSourceAndTarget(
         ? azChanged
           ? `${azDiff >= 0 ? '+' : ''}${Math.round(azDiff)}° orbit shift`
           : 'Preserved (~unchanged)'
-        : 'Shifted to target',
+        : 'Target-defined (inspect source angle)',
     spatialMeaning:
       azDiff !== null && !azChanged
         ? `Maintain approximately the same horizontal viewing direction (~${target.azimuthDeg}°).`
-        : `Orbit the camera horizontally ${azDiff !== null ? `${Math.abs(Math.round(azDiff))}° ${azDiff >= 0 ? 'clockwise (toward camera-right)' : 'counter-clockwise (toward camera-left)'}` : ''} around the fixed subject to reach ${target.azimuthDeg}° (${target.azimuthLabel}).`,
+        : azDiff !== null
+        ? `Orbit the camera horizontally ${Math.abs(Math.round(azDiff))}° ${azDiff >= 0 ? 'clockwise (toward camera-right)' : 'counter-clockwise (toward camera-left)'} around the fixed subject to reach ${target.azimuthDeg}° (${target.azimuthLabel}).`
+        : `Inspect the attached primary image to determine the subject's starting facing axis, then reposition the camera horizontally around the fixed subject to ${target.azimuthDeg}° (${target.azimuthLabel}).`,
   });
   if (azChanged) changedVariables.push('Horizontal Orbit (Azimuth)');
   else unchangedVariables.push('Horizontal Orbit (Azimuth)');
@@ -193,6 +213,8 @@ export function compareSourceAndTarget(
     sourceValue:
       srcEl !== null
         ? `~${srcEl}° (${source.inferredCamera.elevationDeg.confidence} confidence)`
+        : isUnverifiedFallback
+        ? 'Unverified locally (inspect attached primary image)'
         : 'Uncertain from 2D photo',
     targetValue: `${target.elevationDeg}° (${target.elevationLabel})`,
     changed: elChanged,
@@ -201,29 +223,42 @@ export function compareSourceAndTarget(
         ? elChanged
           ? `${elDiff >= 0 ? '+' : ''}${Math.round(elDiff)}° height shift`
           : 'Preserved (~unchanged)'
-        : 'Shifted to target',
+        : 'Target-defined (inspect source elevation)',
     spatialMeaning:
       elDiff !== null && !elChanged
         ? `Keep camera elevation near ${target.elevationDeg}° (${target.elevationLabel}).`
-        : `${elDiff !== null && elDiff > 0 ? 'Raise' : 'Lower'} the camera vertically to ${target.elevationDeg}° elevation (${target.pitchDeg}° lens pitch — ${target.elevationLabel}).`,
+        : elDiff !== null
+        ? `${elDiff > 0 ? 'Raise' : 'Lower'} the camera vertically to ${target.elevationDeg}° elevation (${target.pitchDeg}° lens pitch — ${target.elevationLabel}).`
+        : `Inspect the attached primary image's horizon/eye height, then move the camera vertically to ${target.elevationDeg}° elevation (${target.pitchDeg}° lens pitch — ${target.elevationLabel}).`,
   });
   if (elChanged) changedVariables.push('Camera Elevation & Pitch');
   else unchangedVariables.push('Camera Elevation & Pitch');
 
   // 3. Shot Size / Distance
   const shotChanged = allowFullBodyExpansion
-    ? srcShotLabel.toLowerCase() !== target.shotSize.toLowerCase()
+    ? shotUncertain || srcShotLabel.toLowerCase() !== target.shotSize.toLowerCase()
     : false;
   if (allowFullBodyExpansion) {
     deltas.push({
       variable: 'Shot Size & Distance',
-      sourceValue: `${srcShotLabel} (${source.inferredCamera.distanceLabel}, ${source.inferredCamera.distanceConfidence} confidence)`,
+      sourceValue: shotUncertain
+        ? 'Shot size uncertain automatically (inspect primary image)'
+        : `${srcShotLabel} (${source.inferredCamera.distanceLabel}, ${source.inferredCamera.distanceConfidence} confidence)`,
       targetValue: `${target.shotSize} (${target.distanceMeters}m · full-body requested)`,
       changed: shotChanged,
       magnitudeLabel: shotChanged ? `${srcShotLabel} → ${target.shotSize}` : 'Similar framing scale',
       spatialMeaning: shotChanged
-        ? `Explicitly expand framing from ${srcShotLabel} to ${target.shotSize} (~${target.distanceMeters}m distance, subject filling ~${target.subjectBounds.heightPct}% of frame height) as requested.`
+        ? `Explicitly expand framing from ${shotUncertain ? 'the original source crop' : srcShotLabel} to ${target.shotSize} (~${target.distanceMeters}m distance, subject filling ~${target.subjectBounds.heightPct}% of frame height) as requested.`
         : `Maintain ${target.shotSize} framing (~${target.distanceMeters}m distance).`,
+    });
+  } else if (shotUncertain) {
+    deltas.push({
+      variable: 'Shot Size & Framing Extent',
+      sourceValue: `Uncertain automatically (${source.observable.framingDescription})`,
+      targetValue: 'Preserve original primary image crop & visible body extent',
+      changed: false,
+      magnitudeLabel: 'Framing preserved (shot size uncertain)',
+      spatialMeaning: `Exact shot size could not be reliably classified automatically. Inspect the attached primary image directly and preserve its exact visible body extent, crop edges, and headroom rather than assuming a full-body or different shot size. Use the Playboard distance (${target.distanceMeters}m) solely for perspective parallax.`,
     });
   } else {
     deltas.push({
@@ -252,6 +287,8 @@ export function compareSourceAndTarget(
     magnitudeLabel:
       flDiff !== null && flChanged
         ? `${flDiff > 0 ? 'Narrower/telephoto' : 'Wider'} (${flDiff > 0 ? '+' : ''}${Math.round(flDiff)}mm)`
+        : flDiff === null
+        ? `Target ${target.focalLengthMm}mm optics`
         : 'Comparable lens perspective',
     spatialMeaning: flChanged
       ? `Render with ${target.focalLengthMm}mm equivalent optics (${target.fovDeg}° vFOV, ${target.lensCategoryLabel}) within the preserved framing.`
@@ -272,15 +309,18 @@ export function compareSourceAndTarget(
       spatialMeaning: `Output ${target.aspectRatio} aspect ratio with subject ${target.subjectBounds.placementLabel.toLowerCase()} and ${target.rollDeg}° camera roll.`,
     });
   } else {
+    const placementDisplay = isUnverifiedFallback
+      ? 'subject placement from attached image'
+      : `${srcPlace.toLowerCase()} subject placement`;
     deltas.push({
       variable: 'Framing Placement & Roll',
       sourceValue: `${source.observable.aspectRatioDetected} · ${srcPlace}`,
-      targetValue: `${effectiveAspect} · ${srcPlace} · Roll ${target.rollDeg}°`,
+      targetValue: `${effectiveAspect} · ${isUnverifiedFallback ? 'Source placement' : srcPlace} · Roll ${target.rollDeg}°`,
       changed: rollChanged,
       magnitudeLabel: rollChanged
         ? `Dutch roll ${target.rollDeg}° (framing preserved)`
         : 'Preserved source framing & placement',
-      spatialMeaning: `Preserve the original ${effectiveAspect} composition, ${srcPlace.toLowerCase()} subject placement, and original crop margins while applying ${target.rollDeg}° camera roll.`,
+      spatialMeaning: `Preserve the original ${effectiveAspect} composition, ${placementDisplay}, and original crop margins while applying ${target.rollDeg}° camera roll.`,
     });
     if (!rollChanged) {
       unchangedVariables.push('Framing Placement & Aspect Ratio');
@@ -305,6 +345,8 @@ export function compareSourceAndTarget(
     hiddenDetailImplications.push(
       allowFullBodyExpansion
         ? `Significant horizontal orbit (${target.azimuthDeg}°) reveals side/back regions of the subject and environment that are occluded in the source image.`
+        : shotUncertain
+        ? `Significant horizontal orbit (${target.azimuthDeg}°) reveals side/back regions of the visible subject and adjacent room strictly within the attached image's original crop boundaries.`
         : `Significant horizontal orbit (${target.azimuthDeg}°) reveals side/back regions of the visible subject and adjacent room within the preserved ${srcShotLabel} crop.`
     );
   }
@@ -312,6 +354,8 @@ export function compareSourceAndTarget(
     hiddenDetailImplications.push(
       allowFullBodyExpansion
         ? `High elevation (+${target.elevationDeg}°) exposes the top of the head, shoulder tops, and surrounding floor surface.`
+        : shotUncertain
+        ? `High elevation (+${target.elevationDeg}°) exposes upper surfaces within the attached image's original crop (crown of head, shoulder tops, upper background plane) without zooming out to reveal out-of-frame lower body parts.`
         : `High elevation (+${target.elevationDeg}°) exposes upper surfaces within the preserved ${srcShotLabel} crop (crown of head, shoulder tops, upper background plane) without zooming out to reveal cropped-out lower body parts.`
     );
   }

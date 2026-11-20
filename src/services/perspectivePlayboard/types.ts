@@ -136,10 +136,23 @@ export interface SourceInferredCamera {
   summary: string;
 }
 
+export type SourceAnalysisOrigin = 'gemini_verified' | 'local_fallback';
+
+export type GeminiFallbackReason =
+  | 'quota_exhausted'
+  | 'rate_limited'
+  | 'timeout'
+  | 'service_unavailable'
+  | 'unknown_error';
+
 export interface SourceImageAnalysis {
   analyzedAt: number;
   imageName: string;
   isFallbackEstimate: boolean;
+  analysisOrigin?: SourceAnalysisOrigin;
+  modelUsed?: string;
+  fallbackReason?: GeminiFallbackReason;
+  quotaCause?: string;
   warningMessage?: string;
   observable: SourceObservableFacts;
   inferredCamera: SourceInferredCamera;

@@ -26,6 +26,7 @@ const TOOL_LABELS: Record<ToolType, string> = {
   camera_controller: 'Camera Angle Controller',
   camera_ai: 'Camera AI',
   perspective_playboard: '3D Camera Perspective Playboard',
+  lock_advisor: 'Lock Advisor',
 };
 
 export const BlueprintProjects: React.FC<BlueprintProjectsProps> = ({ onLoadBlueprint }) => {

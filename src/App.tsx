@@ -46,6 +46,7 @@ import { CameraPlayboardStudio } from './components/CameraPlayboardStudio';
 import { SwapStudio } from './components/SwapStudio';
 import { CameraAI } from './components/CameraAI';
 import { PerspectivePlayboard } from './components/perspectivePlayboard/PerspectivePlayboard';
+import { LockAdvisor } from './components/LockAdvisor';
 import {
   GeneralExtractorWorkspace,
   type SceneAccordionGroup,
@@ -75,6 +76,7 @@ import {
   KeyRound,
   Box,
   Play,
+  ShieldCheck,
 } from 'lucide-react';
 
 function checkIsCameraRoute(): { isCameraRoute: boolean; mode: 'playboard' | 'extractor' } {
@@ -1760,6 +1762,7 @@ export default function App() {
     perspective_playboard: '3D Perspective Playboard',
     camera_ai: 'Camera AI',
     camera_controller: 'Camera Angle Controller',
+    lock_advisor: 'Lock Advisor',
   };
 
   const HUB_TOOLS = [
@@ -1812,6 +1815,16 @@ export default function App() {
       desc: 'Dedicated full-screen 3D pose & camera rig workspace for multi-angle staging and reference camera breakdown.',
       icon: Compass,
       accent: 'cyan' as const,
+    },
+    {
+      id: 'lock_advisor' as const,
+      index: '06',
+      category: 'editing' as const,
+      tag: 'Prompt Guard',
+      title: 'Lock Advisor',
+      desc: 'Describe an edit in plain words; get a conflict-checked i2i prompt with the right things locked.',
+      icon: ShieldCheck,
+      accent: 'violet' as const,
     },
   ];
 
@@ -2490,6 +2503,7 @@ export default function App() {
                           { id: 'subject_swapping', label: 'Swap' },
                           { id: 'camera_ai', label: 'Camera AI' },
                           { id: 'perspective_playboard', label: '3D Rig' },
+                          { id: 'lock_advisor', label: 'Locks' },
                         ] as const
                       ).map((t) => {
                         const active = activeTool === t.id;
@@ -2527,6 +2541,8 @@ export default function App() {
                       optimizeImageFile={optimizeImageFile}
                       onOpenProjects={() => setActiveNav('projects')}
                     />
+                  ) : (activeTool as string) === 'lock_advisor' ? (
+                    <LockAdvisor optimizeImageFile={optimizeImageFile} />
                   ) : (
                     <GeneralExtractorWorkspace
                       activeTool={activeTool}

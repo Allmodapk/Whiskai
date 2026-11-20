@@ -3,6 +3,7 @@ import { exportPromptForModel } from '../promptBuilder';
 import {
   compareSourceAndTarget,
   formatSourceShotSizeLabel,
+  isShotSizeUncertain,
 } from './comparisonAndValidation';
 import type {
   CompiledPerspectivePrompt,
@@ -66,9 +67,12 @@ export function compilePerspectivePrompt(params: {
 
   const isImageAwareFramingLocked =
     mode === 'image_aware' && !preservation.requireFullBodyVisibleInOutput;
-  const sourceShotLabel = sourceAnalysis
-    ? formatSourceShotSizeLabel(sourceAnalysis.inferredCamera.shotSize)
-    : '';
+  const isFallbackMode = Boolean(sourceAnalysis?.isFallbackEstimate);
+  const shotUncertain = isShotSizeUncertain(sourceAnalysis);
+  const sourceShotLabel =
+    sourceAnalysis && !shotUncertain
+      ? formatSourceShotSizeLabel(sourceAnalysis.inferredCamera.shotSize)
+      : 'original source crop & visible body extent (shot size uncertain automatically)';
   const sourceAspectRaw = sourceAnalysis?.observable.aspectRatioDetected?.trim() || '';
   const sourceAspectKnown =
     Boolean(sourceAspectRaw) && sourceAspectRaw.toLowerCase() !== 'unknown';
@@ -80,11 +84,24 @@ export function compilePerspectivePrompt(params: {
     sourceAnalysis?.inferredCamera.subjectScalePct !== undefined
       ? ` (~${sourceAnalysis.inferredCamera.subjectScalePct}% frame height)`
       : '';
+  const sourcePlacementClause =
+    isFallbackMode && !sourceAnalysis?.userConfirmedEdits
+      ? 'subject placement from attached image'
+      : `${sourceAnalysis?.inferredCamera.subjectPlacement.toLowerCase() || 'centered'} placement`;
 
   // 1. TASK OBJECTIVE
   let taskObjective: string;
   if (mode === 'camera_first') {
     taskObjective = `Re-photograph the attached primary image from a new target camera perspective (${cam.azimuthLabel}, ${cam.elevationLabel}, ${cam.shotSize}). Treat the supplied primary image as the absolute visual source of truth—preserve the scene and frozen moment while relocating ONLY the camera to the specified target viewpoint.`;
+  } else if (isImageAwareFramingLocked && (isFallbackMode || shotUncertain)) {
+    const framingRef = shotUncertain
+      ? 'original source crop, framing margins, and visible body extent directly observable in the attached photo (shot size was not verified automatically)'
+      : `original ${sourceShotLabel} framing/crop boundaries`;
+    taskObjective = `Re-photograph the attached primary image as an exact same-instant, controlled camera-perspective transformation. ${
+      isFallbackMode
+        ? 'Automated Gemini visual pre-analysis did not complete (local fallback active), so inspect the attached primary image directly as the absolute visual source of truth'
+        : 'Treat the primary image as the absolute source of truth'
+    } for the subject, pose, wardrobe, lighting, environment, and ${framingRef}—move ONLY the virtual camera to the target perspective (${cam.azimuthLabel}, ${cam.elevationLabel}, ${cam.focalLengthMm}mm lens) without redesigning the scene, rotating the subject, or expanding the visible body crop.`;
   } else if (isImageAwareFramingLocked) {
     taskObjective = `Re-photograph the attached primary image as an exact same-instant, controlled camera-perspective transformation. Treat the primary image as the absolute source of truth for the subject, pose, wardrobe, lighting, environment, and original ${sourceShotLabel} framing/crop boundaries—move ONLY the virtual camera to the target perspective (${cam.azimuthLabel}, ${cam.elevationLabel}, ${cam.focalLengthMm}mm lens) while preserving the source photograph's shot size, subject scale, and composition (do NOT expand or convert the framing into a different shot size).`;
   } else {
@@ -92,25 +109,44 @@ export function compilePerspectivePrompt(params: {
   }
 
   // 2. SOURCE IMAGE UNDERSTANDING
-  const sourceImageUnderstanding = sourceAnalysis
-    ? [
-        `Directly observable visual facts from the primary image ("${sourceAnalysis.imageName}"):`,
-        `- Subject: ${sourceAnalysis.observable.subjectDescription}`,
-        `- Body pose & world orientation: ${sourceAnalysis.observable.poseAndOrientation}`,
-        `- Head orientation & gaze: ${sourceAnalysis.observable.headAndGaze}`,
-        `- Clothing & accessories: ${sourceAnalysis.observable.clothingAndAccessories}`,
-        `- Environment & background: ${sourceAnalysis.observable.environmentAndBackground}`,
-        `- Lighting & shadows: ${sourceAnalysis.observable.lightingAndShadows}`,
-        isImageAwareFramingLocked
-          ? `- Original image framing & aspect ratio (CONTROLS OUTPUT FRAMING): ${sourceAnalysis.observable.aspectRatioDetected} (${sourceAnalysis.observable.framingDescription})`
-          : `- Original image framing: ${sourceAnalysis.observable.aspectRatioDetected} (${sourceAnalysis.observable.framingDescription}) — user explicitly requested expanding framing to full-body visibility`,
-        ...(isImageAwareFramingLocked
-          ? [
-              `- Original shot size & crop extent (CONTROLS OUTPUT SHOT SIZE): ${sourceShotLabel}, placement "${sourceAnalysis.inferredCamera.subjectPlacement}"${sourceScaleSuffix} — keep these exact crop limits, headroom, and visible body extent in the output.`,
-            ]
-          : []),
-      ].join('\n')
-    : `No pre-scan analysis was attached inside Whiskai (Camera-First Mode). Inspect the attached primary image directly to read the subject's identity, exact frozen pose, body orientation, gaze direction, wardrobe, lighting direction, and surrounding environment before applying the camera transformation below.`;
+  let sourceImageUnderstanding: string;
+  if (!sourceAnalysis) {
+    sourceImageUnderstanding = `No pre-scan analysis was attached inside Whiskai (Camera-First Mode). Inspect the attached primary image directly to read the subject's identity, exact frozen pose, body orientation, gaze direction, wardrobe, lighting direction, and surrounding environment before applying the camera transformation below.`;
+  } else if (isFallbackMode) {
+    const fallbackNotice =
+      sourceAnalysis.quotaCause ||
+      sourceAnalysis.warningMessage ||
+      'Live Gemini visual analysis unavailable';
+    sourceImageUnderstanding = [
+      `LOCAL FALLBACK ESTIMATE ACTIVE (NOT Gemini-verified visual analysis) for primary image ("${sourceAnalysis.imageName}"):`,
+      `- Fallback notice: ${fallbackNotice}. Do NOT treat unverified local defaults as factual observations—inspect the attached primary photograph directly for subject appearance, pose, wardrobe, lighting, and crop boundaries.`,
+      `- Subject, pose, wardrobe, lighting & environment: ${sourceAnalysis.observable.subjectDescription}.`,
+      `- Measured image aspect ratio: ${sourceAnalysis.observable.aspectRatioDetected}`,
+      isImageAwareFramingLocked
+        ? `- Primary framing constraint (${shotUncertain ? 'shot size uncertain locally' : `user-confirmed ${sourceShotLabel}`}): preserve the exact source crop, headroom, and visible body extent directly shown in the attached primary image (${sourceAnalysis.observable.framingDescription}).`
+        : `- Original image framing: ${sourceAnalysis.observable.aspectRatioDetected} (${sourceAnalysis.observable.framingDescription}) — user explicitly requested expanding framing to full-body visibility.`,
+    ].join('\n');
+  } else {
+    sourceImageUnderstanding = [
+      `Directly observable visual facts from the primary image ("${sourceAnalysis.imageName}"):`,
+      `- Subject: ${sourceAnalysis.observable.subjectDescription}`,
+      `- Body pose & world orientation: ${sourceAnalysis.observable.poseAndOrientation}`,
+      `- Head orientation & gaze: ${sourceAnalysis.observable.headAndGaze}`,
+      `- Clothing & accessories: ${sourceAnalysis.observable.clothingAndAccessories}`,
+      `- Environment & background: ${sourceAnalysis.observable.environmentAndBackground}`,
+      `- Lighting & shadows: ${sourceAnalysis.observable.lightingAndShadows}`,
+      isImageAwareFramingLocked
+        ? `- Original image framing & aspect ratio (CONTROLS OUTPUT FRAMING): ${sourceAnalysis.observable.aspectRatioDetected} (${sourceAnalysis.observable.framingDescription})`
+        : `- Original image framing: ${sourceAnalysis.observable.aspectRatioDetected} (${sourceAnalysis.observable.framingDescription}) — user explicitly requested expanding framing to full-body visibility`,
+      ...(isImageAwareFramingLocked
+        ? [
+            shotUncertain
+              ? `- Original shot size & crop extent (CONTROLS OUTPUT FRAMING — shot size uncertain): inspect the attached image directly to preserve its exact visible body extent, crop limits, headroom, and ${sourcePlacementClause}${sourceScaleSuffix}.`
+              : `- Original shot size & crop extent (CONTROLS OUTPUT SHOT SIZE): ${sourceShotLabel}, placement "${sourceAnalysis.inferredCamera.subjectPlacement}"${sourceScaleSuffix} — keep these exact crop limits, headroom, and visible body extent in the output.`,
+          ]
+        : []),
+    ].join('\n');
+  }
 
   // 3. ORIGINAL CAMERA PERSPECTIVE
   let originalCameraPerspective: string;
@@ -119,21 +155,26 @@ export function compilePerspectivePrompt(params: {
     const azText =
       inf.azimuthDeg.value !== null
         ? `approximately ${inf.azimuthDeg.value}° (${inf.azimuthDeg.confidence} confidence${inf.azimuthDeg.rangeMin !== null && inf.azimuthDeg.rangeMax !== null ? `, plausible range ${inf.azimuthDeg.rangeMin}° to ${inf.azimuthDeg.rangeMax}°` : ''})`
-        : `uncertain (${inf.azimuthDeg.confidence} confidence)`;
+        : `uncertain (${inf.azimuthDeg.confidence} confidence — inspect attached primary image directly)`;
     const elText =
       inf.elevationDeg.value !== null
         ? `approximately ${inf.elevationDeg.value}° elevation (${inf.elevationDeg.confidence} confidence${inf.elevationDeg.rangeMin !== null && inf.elevationDeg.rangeMax !== null ? `, range ${inf.elevationDeg.rangeMin}° to ${inf.elevationDeg.rangeMax}°` : ''})`
-        : `uncertain (${inf.elevationDeg.confidence} confidence)`;
+        : `uncertain (${inf.elevationDeg.confidence} confidence — inspect attached primary image directly)`;
     const flText =
       inf.focalLengthMm.value !== null
         ? `roughly ${inf.focalLengthMm.value}mm equivalent (${inf.focalLengthMm.confidence} confidence)`
         : `${inf.perspectiveCharacter} (${inf.focalLengthMm.confidence} confidence)`;
+    const shotLine = shotUncertain
+      ? `Uncertain (${inf.shotSizeConfidence} confidence — could not be reliably determined automatically; preserve original crop & visible body extent from attached image)`
+      : `${sourceShotLabel} at ${inf.distanceLabel} distance (${inf.distanceConfidence} confidence)`;
 
     originalCameraPerspective = [
-      `Estimated starting viewpoint inferred from 2D visual cues (these are approximate estimates, not physical measurements):`,
+      isFallbackMode
+        ? `Starting camera cues (UNVERIFIED local fallback — inspect the attached primary image directly rather than assuming default coordinates or shot sizes):`
+        : `Estimated starting viewpoint inferred from 2D visual cues (these are approximate estimates, not physical measurements):`,
       `- Original azimuth: ${azText}`,
       `- Original elevation: ${elText}`,
-      `- Approximate distance & shot size: ${sourceShotLabel} at ${inf.distanceLabel} distance (${inf.distanceConfidence} confidence)`,
+      `- Approximate distance & shot size: ${shotLine}`,
       `- Lens / perspective character: ${flText}`,
       `- Source subject placement: ${inf.subjectPlacement}${sourceScaleSuffix}`,
       `- Framing & crop baseline: ${sourceAnalysis.observable.aspectRatioDetected} · ${sourceAnalysis.observable.framingDescription}`,
@@ -166,13 +207,17 @@ export function compilePerspectivePrompt(params: {
       `- Camera roll: ${describeRollVisualMeaning(cam.rollDeg)}.`,
     ].join('\n');
   } else {
+    const preservedFramingLine = shotUncertain
+      ? `- Preserved Output Framing (primary constraint — shot size uncertain automatically): preserve the exact source crop, visible body extent, ${sourcePlacementClause}${sourceScaleSuffix}, original headroom/crop margins, and ${effectiveSourceAspect} composition directly visible in the attached primary image. Do NOT invent a confident shot size or let the virtual reference rig force a wider or full-body shot.`
+      : `- Preserved Output Framing (controlled by primary image): retain the source image's ${sourceShotLabel} shot size (${sourceAnalysis!.observable.framingDescription}), ${sourcePlacementClause}${sourceScaleSuffix}, original headroom/crop boundaries, and ${effectiveSourceAspect} composition. Do NOT let the virtual reference rig force a wider or full-body shot.`;
+
     targetCameraPerspective = [
       `Locked 3D Playboard Target Camera Perspective (captured at ${new Date(lockedFrame.lockedAt).toISOString()}; Playboard defines camera viewpoint & optics ONLY, while the primary image controls output framing):`,
       `- Viewing direction (Azimuth): ${cam.azimuthLabel} at ${cam.azimuthDeg}° — camera sits ${describeOrbitSpatialMotion(cam.azimuthDeg)}.`,
       `- Camera height & tilt (Elevation / Pitch): ${cam.elevationLabel} — camera is ${describeElevationSpatialMeaning(cam.elevationDeg, cam.pitchDeg)}.`,
       `- Optical lens & perspective projection: ${cam.focalLengthMm}mm full-frame equivalent (${cam.fovDeg}° vertical FOV, ${cam.lensCategoryLabel}, ${cam.projectionType} projection) at ~${cam.distanceMeters}m rig distance (parallax reference only—do NOT zoom out to alter shot size).`,
       `- Camera roll: ${describeRollVisualMeaning(cam.rollDeg)}.`,
-      `- Preserved Output Framing (controlled by primary image): retain the source image's ${sourceShotLabel} shot size (${sourceAnalysis!.observable.framingDescription}), ${sourceAnalysis!.inferredCamera.subjectPlacement.toLowerCase()} subject placement${sourceScaleSuffix}, original headroom/crop boundaries, and ${effectiveSourceAspect} composition. Do NOT let the virtual reference rig force a wider or full-body shot.`,
+      preservedFramingLine,
     ].join('\n');
   }
 
@@ -192,7 +237,9 @@ export function compilePerspectivePrompt(params: {
   ];
   if (isImageAwareFramingLocked) {
     requiredCameraTransformationLines.push(
-      `- FRAMING & CROP LOCK: Keep the output framed strictly as the primary image's ${sourceShotLabel} (${sourceAnalysis!.observable.framingDescription}). Shifting azimuth, elevation, or focal perspective must NOT pull the camera back to reveal out-of-frame lower body regions.`
+      shotUncertain
+        ? `- FRAMING & CROP LOCK: Keep the output framed strictly to the attached primary image's original source crop and visible body extent (shot size was not reliably determined automatically). Shifting azimuth, elevation, or focal perspective must NOT pull the camera back to reveal out-of-frame lower body regions.`
+        : `- FRAMING & CROP LOCK: Keep the output framed strictly as the primary image's ${sourceShotLabel} (${sourceAnalysis!.observable.framingDescription}). Shifting azimuth, elevation, or focal perspective must NOT pull the camera back to reveal out-of-frame lower body regions.`
     );
   }
   const requiredCameraTransformation = requiredCameraTransformationLines.join('\n');
@@ -229,7 +276,9 @@ export function compilePerspectivePrompt(params: {
   }
   if (isImageAwareFramingLocked) {
     preservedList.push(
-      `Original ${sourceShotLabel} shot size, visible body extent (${sourceAnalysis!.observable.framingDescription}), ${sourceAnalysis!.inferredCamera.subjectPlacement.toLowerCase()} placement${sourceScaleSuffix}, headroom, and ${effectiveSourceAspect} crop boundaries`
+      shotUncertain
+        ? `Original source crop, visible body extent, ${sourcePlacementClause}${sourceScaleSuffix}, headroom, and ${effectiveSourceAspect} framing boundaries directly observable in the attached primary image (shot size uncertain automatically)`
+        : `Original ${sourceShotLabel} shot size, visible body extent (${sourceAnalysis!.observable.framingDescription}), ${sourcePlacementClause}${sourceScaleSuffix}, headroom, and ${effectiveSourceAspect} crop boundaries`
     );
   }
   if (preservation.additionalUserNotes.trim()) {
@@ -260,7 +309,9 @@ export function compilePerspectivePrompt(params: {
     ? [
         ...comparison.hiddenDetailImplications.map((h) => `- ${h}`),
         `- When the new camera angle reveals surfaces occluded within the preserved frame (e.g., side profile, ear/hair side, shoulder/collar continuation, or adjacent background wall), synthesize only plausible continuations of the existing garments, anatomy, and room design without inventing unrequested props.`,
-        `- Strictly maintain the original framing boundaries (${sourceShotLabel}; ${sourceAnalysis!.observable.framingDescription}): do NOT zoom out, uncrop, or reconstruct out-of-frame lower body anatomy, legs, or feet beyond the primary image's established crop.`,
+        shotUncertain
+          ? `- Strictly maintain the attached primary image's original source crop and visible body extent (even though exact shot size was not automatically verified): do NOT zoom out, uncrop, or reconstruct out-of-frame lower body anatomy, legs, or feet beyond the attached image's framing.`
+          : `- Strictly maintain the original framing boundaries (${sourceShotLabel}; ${sourceAnalysis!.observable.framingDescription}): do NOT zoom out, uncrop, or reconstruct out-of-frame lower body anatomy, legs, or feet beyond the primary image's established crop.`,
       ]
     : [
         ...comparison.hiddenDetailImplications.map((h) => `- ${h}`),
@@ -275,9 +326,14 @@ export function compilePerspectivePrompt(params: {
       `- Output a single, clean ${cam.aspectRatio} photograph framed as a ${cam.shotSize} from the locked target camera (${cam.azimuthDeg}° azimuth, ${cam.elevationDeg}° elevation, ${cam.distanceMeters}m distance, ${cam.focalLengthMm}mm lens, ${cam.rollDeg}° roll).`,
       `- Ensure zero extra people, zero duplicated limbs, zero scene restyling, and zero UI overlays or borders.`,
     ].join('\n');
+  } else if (isImageAwareFramingLocked && shotUncertain) {
+    finalOutputRequirements = [
+      `- Output a single, clean photograph in the ${effectiveSourceAspect} preserving the attached primary image's exact original source crop, visible body extent, and ${sourcePlacementClause}${sourceScaleSuffix} (shot size uncertain automatically — match the attached image directly), viewed from the target camera perspective (${cam.azimuthDeg}° azimuth, ${cam.elevationDeg}° elevation, ${cam.focalLengthMm}mm lens, ${cam.rollDeg}° roll).`,
+      `- Ensure zero extra people, zero duplicated limbs, zero unrequested expansion beyond the source crop boundaries, zero scene restyling, and zero UI overlays or borders.`,
+    ].join('\n');
   } else if (isImageAwareFramingLocked) {
     finalOutputRequirements = [
-      `- Output a single, clean photograph in the ${effectiveSourceAspect} preserving the primary image's ${sourceShotLabel} framing (${sourceAnalysis!.observable.framingDescription}, ${sourceAnalysis!.inferredCamera.subjectPlacement.toLowerCase()} placement${sourceScaleSuffix}), viewed from the target camera perspective (${cam.azimuthDeg}° azimuth, ${cam.elevationDeg}° elevation, ${cam.focalLengthMm}mm lens, ${cam.rollDeg}° roll).`,
+      `- Output a single, clean photograph in the ${effectiveSourceAspect} preserving the primary image's ${sourceShotLabel} framing (${sourceAnalysis!.observable.framingDescription}, ${sourcePlacementClause}${sourceScaleSuffix}), viewed from the target camera perspective (${cam.azimuthDeg}° azimuth, ${cam.elevationDeg}° elevation, ${cam.focalLengthMm}mm lens, ${cam.rollDeg}° roll).`,
       `- Ensure zero extra people, zero duplicated limbs, zero unrequested expansion beyond the source crop boundaries, zero scene restyling, and zero UI overlays or borders.`,
     ].join('\n');
   } else {

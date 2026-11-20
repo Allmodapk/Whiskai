@@ -142,11 +142,11 @@ function resolveServerGeminiApiKey(customKey?: string): string {
 }
 
 // Helper to get GoogleGenAI client with user-agent and bounded HTTP timeout
-function createGenAIClientForKey(apiKey: string) {
+function createGenAIClientForKey(apiKey: string, httpTimeoutMs = 12000) {
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
-      timeout: 12000,
+      timeout: httpTimeoutMs,
       headers: {
         'User-Agent': 'aistudio-build',
       },
@@ -851,7 +851,17 @@ async function generateWithFallback(
   aiOrKey: GoogleGenAI | string | undefined,
   parts: any[],
   jsonMode = true,
-  customKey?: string
+  customKey?: string,
+  options?: {
+    systemInstruction?: string;
+    models?: Array<{
+      name: string;
+      timeoutMs: number;
+      thinkingLevel?: ThinkingLevel;
+    }>;
+    maxTotalBudgetMs?: number;
+    httpTimeoutMs?: number;
+  }
 ): Promise<{
   text: string;
   parsed?: any;
@@ -879,7 +889,7 @@ async function generateWithFallback(
   );
   const clients: GoogleGenAI[] =
     candidateKeys.length > 0
-      ? candidateKeys.map((k) => createGenAIClientForKey(k))
+      ? candidateKeys.map((k) => createGenAIClientForKey(k, options?.httpTimeoutMs))
       : aiOrKey && typeof aiOrKey === 'object'
       ? [aiOrKey]
       : [getGenAIClient(customKey)];
@@ -889,14 +899,14 @@ async function generateWithFallback(
     name: string;
     timeoutMs: number;
     thinkingLevel?: ThinkingLevel;
-  }> = [
+  }> = options?.models ?? [
     { name: 'gemini-3.8-flash', timeoutMs: 22000, thinkingLevel: ThinkingLevel.LOW },
     { name: 'gemini-3.1-flash-lite', timeoutMs: 20000, thinkingLevel: ThinkingLevel.LOW },
     { name: 'gemini-flash-latest', timeoutMs: 20000 },
   ];
 
   const startTime = Date.now();
-  const MAX_TOTAL_BUDGET_MS = 42000;
+  const MAX_TOTAL_BUDGET_MS = options?.maxTotalBudgetMs ?? 42000;
 
   let lastError: any = null;
   let modelUsed = fallbackModels[0].name;
@@ -922,6 +932,9 @@ async function generateWithFallback(
           temperature: 0.2,
           maxOutputTokens: 8192,
         };
+        if (options?.systemInstruction) {
+          config.systemInstruction = options.systemInstruction;
+        }
         if (modelConfig.thinkingLevel !== undefined) {
           config.thinkingConfig = { thinkingLevel: modelConfig.thinkingLevel };
         }
@@ -2083,6 +2096,78 @@ function buildCameraAiBaseQuotaFallback(base64Data?: string): CameraAiBaseAnalys
   };
 }
 
+function extractCameraAiFallbackDiagnostics(err: any): {
+  fallbackReason: 'quota_exhausted' | 'rate_limited' | 'timeout' | 'service_unavailable';
+  quotaCause: string;
+  warning: string;
+  httpStatus?: number;
+  errorCode?: string;
+} {
+  const status =
+    typeof err?.status === 'number'
+      ? err.status
+      : typeof err?.statusCode === 'number'
+      ? err.statusCode
+      : undefined;
+  const errorCode = typeof err?.code === 'string' ? err.code : undefined;
+  const quotaCause = formatServerErrorMessage(
+    err,
+    'Live Gemini visual analysis service reached a quota or availability limit.'
+  );
+  const lower = quotaCause.toLowerCase();
+
+  if (
+    errorCode === 'MODEL_TIMEOUT' ||
+    status === 504 ||
+    lower.includes('timed out') ||
+    lower.includes('timeout')
+  ) {
+    return {
+      fallbackReason: 'timeout',
+      quotaCause,
+      warning: 'Gemini visual analysis timed out; local fallback estimate used (reduced accuracy).',
+      httpStatus: status,
+      errorCode,
+    };
+  }
+
+  if (
+    lower.includes('quota') ||
+    lower.includes('resource_exhausted') ||
+    lower.includes('exceeded') ||
+    lower.includes('billing')
+  ) {
+    return {
+      fallbackReason: 'quota_exhausted',
+      quotaCause,
+      warning:
+        'Live Gemini quota reached; local fallback estimate used (reduced accuracy).',
+      httpStatus: status ?? 429,
+      errorCode,
+    };
+  }
+
+  if (status === 429 || lower.includes('429') || lower.includes('rate limit')) {
+    return {
+      fallbackReason: 'rate_limited',
+      quotaCause,
+      warning:
+        'Gemini rate limit reached; local fallback estimate used (reduced accuracy).',
+      httpStatus: status ?? 429,
+      errorCode,
+    };
+  }
+
+  return {
+    fallbackReason: 'service_unavailable',
+    quotaCause,
+    warning:
+      'Gemini visual service temporarily unavailable; local fallback estimate used (reduced accuracy).',
+    httpStatus: status ?? 503,
+    errorCode,
+  };
+}
+
 async function generateCameraAiWithFallback(
   aiOrKey: GoogleGenAI | string | undefined,
   parts: any[],
@@ -2097,7 +2182,7 @@ async function generateCameraAiWithFallback(
   const isQuotaOrRateLimit = (err: any): boolean => {
     const status = err?.status || err?.statusCode || err?.code;
     if (status === 429 || status === '429') return true;
-    const msg = String(err?.message || '').toLowerCase();
+    const msg = formatServerErrorMessage(err, '').toLowerCase();
     return (
       msg.includes('429') ||
       msg.includes('quota') ||
@@ -2111,7 +2196,7 @@ async function generateCameraAiWithFallback(
   );
   const clients: GoogleGenAI[] =
     candidateKeys.length > 0
-      ? candidateKeys.map((k) => createGenAIClientForKey(k))
+      ? candidateKeys.map((k) => createGenAIClientForKey(k, 28000))
       : aiOrKey && typeof aiOrKey === 'object'
       ? [aiOrKey]
       : [getGenAIClient(customKey)];
@@ -2121,9 +2206,9 @@ async function generateCameraAiWithFallback(
     timeoutMs: number;
     thinkingLevel?: ThinkingLevel;
   }> = [
-    { name: 'gemini-3.8-flash', timeoutMs: 38000, thinkingLevel: ThinkingLevel.HIGH },
-    { name: 'gemini-3.1-flash-lite', timeoutMs: 35000, thinkingLevel: ThinkingLevel.HIGH },
-    { name: 'gemini-flash-latest', timeoutMs: 30000 },
+    { name: 'gemini-3.8-flash', timeoutMs: 28000, thinkingLevel: ThinkingLevel.HIGH },
+    { name: 'gemini-3.1-flash-lite', timeoutMs: 25000, thinkingLevel: ThinkingLevel.LOW },
+    { name: 'gemini-flash-latest', timeoutMs: 22000 },
   ];
 
   const startTime = Date.now();
@@ -2181,7 +2266,25 @@ async function generateCameraAiWithFallback(
         };
       } catch (err: any) {
         lastError = err;
-        if (isQuotaOrRateLimit(err)) continue;
+        const errMsg = formatServerErrorMessage(err, '').toLowerCase();
+        const isAuthError =
+          err?.status === 401 ||
+          err?.status === 403 ||
+          errMsg.includes('api_key_invalid') ||
+          errMsg.includes('api key not valid') ||
+          errMsg.includes('permission_denied');
+
+        if (isAuthError) {
+          if (clientIdx + 1 < clients.length) {
+            break;
+          }
+          throw err;
+        }
+
+        // Do not repeatedly retry models against the same exhausted key when quota is reported
+        if (isQuotaOrRateLimit(err)) {
+          break;
+        }
       }
     }
   }
@@ -2428,13 +2531,18 @@ Return PURE JSON matching this structure:
 
     if (isQuotaOrServiceUnavailable(err)) {
       const fallback = buildCameraAiBaseQuotaFallback(req.body?.image?.data);
+      const diagnostics = extractCameraAiFallbackDiagnostics(err);
       return res.status(200).json({
         success: true,
         analysis: fallback,
         modelUsed: 'local-optical-blueprint',
         switchedToBackup: true,
         quotaFallback: true,
-        warning: 'Live Gemini quota reached; base image characteristics estimated locally.',
+        fallbackReason: diagnostics.fallbackReason,
+        quotaCause: diagnostics.quotaCause,
+        httpStatus: diagnostics.httpStatus,
+        errorCode: diagnostics.errorCode,
+        warning: diagnostics.warning,
       });
     }
 
@@ -2448,6 +2556,339 @@ Return PURE JSON matching this structure:
     });
   }
 });
+
+// ============================================================================
+// LOCK ADVISOR ENDPOINT (/api/lock-advisor/analyze)
+// ============================================================================
+
+const LOCK_ADVISOR_SYSTEM_INSTRUCTION =
+  "You are a prompt-safety planner for image-to-image and video edits. You receive (a) the user's edit task, (b) a lock catalog of 13 categories with numbered items, (c) optional images. Decide what stays locked.\n" +
+  '1. Default is everything locked. Release only what the task truly requires changing. If the user says keep the rest untouched, all other categories are locked.\n' +
+  "2. Prefer 'partial' over 'released'. Example: outfit change to full sleeves and trousers means Clothing is partial: keep Footwear, and write a note that color, fabric and pattern carry over from the original while only sleeve length and lower garment type change.\n" +
+  '3. Color lock [1] stays locked unless the task asks for a new color. Never release it silently.\n' +
+  '4. When a garment or visible area changes, set uses_body_rules=true and consider add-on A (newly exposed or covered areas) and add-on B (blending, shadows).\n' +
+  '5. Identity [2], Skin [3] and Body and pose [5] stay locked for outfit-only tasks. Sleeves or trousers must not reshape the body or hide hands, neck or ears.\n' +
+  '6. Video only [13] is locked only when media is video; otherwise released.\n' +
+  '7. If the task contradicts a lock the user pinned, do not override the pin. Report a conflict with a one-tap fix. A locked element wins over the task.\n' +
+  '8. If the task is ambiguous, return your best decision plus ONE clarifying_question.\n' +
+  '9. Use only ids and item indexes from the catalog. Never rewrite catalog wording. Keep each reason under 12 words. Output JSON only.';
+
+const LOCK_ADVISOR_SERVER_CATALOG: ReadonlyArray<{ id: number; name: string; items: readonly string[] }> = [
+  { id: 1, name: 'Color and grade', items: ['All colors in the image', 'Brightness, exposure, contrast', 'Saturation, hue, tint', 'Warmth, color temperature, color grade', 'No relighting, filter look, tone mapping, or enhancement'] },
+  { id: 2, name: 'Identity', items: ['Face shape, bone structure, proportions', 'Eyes, eyebrows, nose, lips, jawline, chin', 'Eye color', 'Expression', 'Gaze direction', 'No face drift, face swap, or blending'] },
+  { id: 3, name: 'Skin', items: ['Skin tone and undertone', 'Texture and pores', 'Marks, moles, freckles, natural lines', 'Natural shine and reflectivity', 'No smoothing, airbrushing, or beautification'] },
+  { id: 4, name: 'Hair', items: ['Hairstyle and arrangement', 'Hair length, volume, density', 'Hair color, roots, highlights, lowlights', 'Parting and hairline', 'Strand direction, flow, and texture', 'Loose strands and baby hairs', 'Hair shine and highlights', 'Hair movement (video)'] },
+  { id: 5, name: 'Body and pose', items: ['Body shape and proportions', 'Height impression, shoulders, waist, hips, limbs', 'Ears, neck', 'Pose and body position', 'Head angle and position', 'Hand and finger placement'] },
+  { id: 6, name: 'Clothing', items: ['Garment type, color, fabric, pattern', 'Fit, draping, folds', 'Neckline, sleeves, hem', 'Footwear (if visible)'] },
+  { id: 7, name: 'Accessories and jewelry', items: ['All existing items exactly as they appear', 'Nothing added', 'Nothing removed'] },
+  { id: 8, name: 'Scene', items: ['Background and environment', 'Objects and props', 'Depth and atmosphere', 'Nothing added, nothing removed'] },
+  { id: 9, name: 'Lighting', items: ['Light direction and quality', 'Shadows and reflections', 'Highlights and exposure balance'] },
+  { id: 10, name: 'Camera and technical', items: ['Framing, crop, aspect ratio, resolution', 'Camera angle and perspective', 'Lens distortion characteristics', 'Sharpness and grain', 'No zoom, reframing, or padding', 'Subject size and position in frame'] },
+  { id: 11, name: 'Realism rules', items: ['Photorealistic', 'No pasted, plastic, or cut-out look', 'No halo or edge artifacts', 'No hallucinated details'] },
+  { id: 12, name: 'Output', items: ['Same resolution and aspect ratio', 'Looks like an unedited real photograph'] },
+  { id: 13, name: 'Video only', items: ['Camera movement, no stabilizing', 'Subject motion, frame by frame', 'Lip-sync to the original audio', 'Audio, untouched and unshifted', 'No flickering or frame drift'] },
+];
+
+function sanitizeLockAdvisorDecisionOnServer(
+  raw: any,
+  opts: { media: 'image' | 'video'; task: string; pinnedLocks: number[]; hasImage2: boolean }
+) {
+  const validCatIds = new Set(LOCK_ADVISOR_SERVER_CATALOG.map((c) => c.id));
+  const itemCounts = new Map(LOCK_ADVISOR_SERVER_CATALOG.map((c) => [c.id, c.items.length]));
+  const obj = raw && typeof raw === 'object' ? raw : {};
+
+  const media: 'image' | 'video' = opts.media === 'video' ? 'video' : 'image';
+  const understood_task =
+    typeof obj.understood_task === 'string' && obj.understood_task.trim()
+      ? obj.understood_task.trim()
+      : opts.task;
+
+  const changes: Array<{ what: string; category_ids: number[] }> = [];
+  if (Array.isArray(obj.changes)) {
+    for (const ch of obj.changes) {
+      if (!ch || typeof ch !== 'object') continue;
+      const what = typeof ch.what === 'string' ? ch.what.trim() : '';
+      if (!what) continue;
+      const category_ids = Array.from(
+        new Set<number>(
+          (Array.isArray(ch.category_ids) ? ch.category_ids : [])
+            .map((n: any) => Number(n))
+            .filter((n: number) => Number.isInteger(n) && validCatIds.has(n))
+        )
+      ).sort((a, b) => a - b);
+      changes.push({ what, category_ids });
+    }
+  }
+
+  const incomingById = new Map<number, any>();
+  if (Array.isArray(obj.categories)) {
+    for (const item of obj.categories) {
+      if (!item || typeof item !== 'object') continue;
+      const id = Number(item.id);
+      if (!Number.isInteger(id) || !validCatIds.has(id) || incomingById.has(id)) continue;
+      incomingById.set(id, item);
+    }
+  }
+
+  const pinnedSet = new Set(
+    opts.pinnedLocks.filter((n) => Number.isInteger(n) && validCatIds.has(n))
+  );
+
+  const categories = LOCK_ADVISOR_SERVER_CATALOG.map((cat) => {
+    const id = cat.id;
+    const maxItems = itemCounts.get(id) ?? cat.items.length;
+
+    if (id === 13 && media === 'image') {
+      return { id: 13, status: 'released' as const, reason: 'Not applicable in image mode.' };
+    }
+
+    const src = incomingById.get(id);
+    if (!src) {
+      return { id, status: 'locked' as const, reason: 'Locked by default.' };
+    }
+
+    let status: 'locked' | 'partial' | 'released' =
+      src.status === 'locked' || src.status === 'partial' || src.status === 'released'
+        ? src.status
+        : 'locked';
+
+    if (pinnedSet.has(id)) {
+      status = 'locked';
+    }
+
+    const reason =
+      typeof src.reason === 'string' && src.reason.trim()
+        ? src.reason.trim()
+        : status === 'locked'
+        ? 'Locked by default.'
+        : status === 'partial'
+        ? 'Partially locked for edit.'
+        : 'Released for edit.';
+
+    if (status === 'partial') {
+      const keep_item_indexes = Array.from(
+        new Set<number>(
+          (Array.isArray(src.keep_item_indexes) ? src.keep_item_indexes : [])
+            .map((n: any) => Number(n))
+            .filter((n: number) => Number.isInteger(n) && n >= 0 && n < maxItems)
+        )
+      ).sort((a, b) => a - b);
+      const note = typeof src.note === 'string' && src.note.trim() ? src.note.trim() : undefined;
+      return {
+        id,
+        status: 'partial' as const,
+        keep_item_indexes,
+        ...(note ? { note } : {}),
+        reason,
+      };
+    }
+
+    return { id, status, reason };
+  });
+
+  const addonSet = new Set<'A' | 'B'>();
+  if (Array.isArray(obj.addon_ids)) {
+    for (const a of obj.addon_ids) {
+      if (a === 'A' || a === 'B') addonSet.add(a);
+    }
+  }
+  const addon_ids = (['A', 'B'] as const).filter((id) => addonSet.has(id));
+
+  const change_block =
+    typeof obj.change_block === 'string' && obj.change_block.trim()
+      ? obj.change_block.trim()
+      : opts.task;
+
+  const uses_body_rules = Boolean(obj.uses_body_rules);
+  const uses_image_roles = opts.hasImage2 && Boolean(obj.uses_image_roles);
+
+  const validActionTypes = new Set(['release', 'lock', 'partial', 'set_media', 'edit_task']);
+  const conflicts: any[] = [];
+  const seenConflictIds = new Set<string>();
+  if (Array.isArray(obj.conflicts)) {
+    for (let i = 0; i < obj.conflicts.length; i++) {
+      const c = obj.conflicts[i];
+      if (!c || typeof c !== 'object') continue;
+      const message = typeof c.message === 'string' ? c.message.trim() : '';
+      if (!message) continue;
+      const cid =
+        typeof c.id === 'string' && c.id.trim() ? c.id.trim() : `ai_conflict_${i + 1}`;
+      if (seenConflictIds.has(cid)) continue;
+      const category_ids = Array.from(
+        new Set<number>(
+          (Array.isArray(c.category_ids) ? c.category_ids : [])
+            .map((n: any) => Number(n))
+            .filter((n: number) => Number.isInteger(n) && validCatIds.has(n))
+        )
+      ).sort((a, b) => a - b);
+      const fixLabel =
+        typeof c.fix?.label === 'string' && c.fix.label.trim() ? c.fix.label.trim() : 'Release';
+      const rawType = c.fix?.action?.type;
+      const fixAction: Record<string, any> = {
+        type: validActionTypes.has(rawType) ? rawType : category_ids[0] ? 'release' : 'edit_task',
+      };
+      if (c.fix?.action?.category_id !== undefined) {
+        const acId = Number(c.fix.action.category_id);
+        if (Number.isInteger(acId) && validCatIds.has(acId)) {
+          fixAction.category_id = acId;
+        }
+      } else if (category_ids[0] && ['release', 'lock', 'partial'].includes(fixAction.type)) {
+        fixAction.category_id = category_ids[0];
+      }
+      if (Array.isArray(c.fix?.action?.keep_item_indexes) && fixAction.category_id) {
+        const maxLen = itemCounts.get(fixAction.category_id) ?? 0;
+        fixAction.keep_item_indexes = Array.from(
+          new Set<number>(
+            c.fix.action.keep_item_indexes
+              .map((n: any) => Number(n))
+              .filter((n: number) => Number.isInteger(n) && n >= 0 && n < maxLen)
+          )
+        ).sort((a, b) => a - b);
+      }
+      if (typeof c.fix?.action?.value === 'string' && c.fix.action.value.trim()) {
+        fixAction.value = c.fix.action.value.trim();
+      }
+      seenConflictIds.add(cid);
+      conflicts.push({
+        id: cid,
+        severity: c.severity === 'blocking' ? 'blocking' : 'warning',
+        category_ids,
+        message,
+        fix: { label: fixLabel, action: fixAction },
+      });
+    }
+  }
+
+  const clarifying_question =
+    typeof obj.clarifying_question === 'string' && obj.clarifying_question.trim()
+      ? obj.clarifying_question.trim()
+      : null;
+
+  return {
+    media,
+    understood_task,
+    changes,
+    categories,
+    addon_ids,
+    change_block,
+    uses_body_rules,
+    uses_image_roles,
+    conflicts,
+    clarifying_question,
+  };
+}
+
+app.post('/api/lock-advisor/analyze', async (req, res) => {
+  try {
+    const customKey = (req.headers['x-gemini-key'] as string) || req.body?.customKey;
+    const task = typeof req.body?.task === 'string' ? req.body.task.trim() : '';
+    const media: 'image' | 'video' = req.body?.media === 'video' ? 'video' : 'image';
+    const pinnedLocks: number[] = Array.isArray(req.body?.pinnedLocks)
+      ? req.body.pinnedLocks
+          .map((n: any) => Number(n))
+          .filter((n: number) => Number.isInteger(n) && n >= 1 && n <= 13)
+      : [];
+    const image1 = req.body?.image1;
+    const image2 = req.body?.image2;
+    const overrides = req.body?.overrides;
+
+    if (!task) {
+      return res.status(400).json({ error: 'Please describe the edit task to analyze.' });
+    }
+
+    const ai = getGenAIClient(customKey);
+
+    const catalogText = LOCK_ADVISOR_SERVER_CATALOG.map(
+      (c) =>
+        `[${c.id}] ${c.name}:\n` +
+        c.items.map((item, idx) => `  ${idx}: ${item}`).join('\n')
+    ).join('\n');
+
+    const userPrompt = [
+      `MEDIA: ${media}`,
+      `TASK: ${task}`,
+      `USER PINNED LOCKS (must stay locked; report conflict if task contradicts): ${
+        pinnedLocks.length > 0 ? pinnedLocks.join(', ') : 'none'
+      }`,
+      `IMAGES PROVIDED: Image 1 (photo to edit)=${image1?.data ? 'yes' : 'no'}, Image 2 (reference)=${image2?.data ? 'yes' : 'no'}`,
+      overrides && Array.isArray(overrides) && overrides.length > 0
+        ? `USER MANUAL OVERRIDES TO CHECK FOR CONFLICTS: ${JSON.stringify(overrides)}`
+        : '',
+      '',
+      'CATALOG (13 categories with 0-based item indexes):',
+      catalogText,
+      '',
+      'ADD-ONS:',
+      'A: Newly exposed areas (revealed skin, revealed background, natural hairline)',
+      'B: Blending (realistic shadows, matching sharpness, texture, and lighting)',
+      '',
+      'Return PURE JSON matching this exact schema:',
+      '{',
+      '  "media": "image" | "video",',
+      '  "understood_task": "one concise sentence",',
+      '  "changes": [{ "what": "short description", "category_ids": [6] }],',
+      '  "categories": [{ "id": 1, "status": "locked" | "partial" | "released", "keep_item_indexes": [3], "note": "only when partial", "reason": "under 12 words" }],',
+      '  "addon_ids": ["A", "B"],',
+      '  "change_block": "CHANGE sentence(s) only, no lock wording",',
+      '  "uses_body_rules": true,',
+      '  "uses_image_roles": false,',
+      '  "conflicts": [{ "id": "conflict_id", "severity": "warning", "category_ids": [4], "message": "...", "fix": { "label": "Release", "action": { "type": "release", "category_id": 4 } } }],',
+      '  "clarifying_question": null',
+      '}',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const parts: any[] = [{ text: userPrompt }];
+    if (image1?.data) {
+      parts.push({
+        inlineData: {
+          data: image1.data,
+          mimeType: image1.mimeType || 'image/jpeg',
+        },
+      });
+    }
+    if (image2?.data) {
+      parts.push({
+        inlineData: {
+          data: image2.data,
+          mimeType: image2.mimeType || 'image/jpeg',
+        },
+      });
+    }
+
+    const { parsed, text } = await generateWithFallback(ai, parts, true, customKey, {
+      systemInstruction: LOCK_ADVISOR_SYSTEM_INSTRUCTION,
+      models: [
+        { name: 'gemini-3.8-flash', timeoutMs: 24000, thinkingLevel: ThinkingLevel.HIGH },
+        { name: 'gemini-3.1-flash-lite', timeoutMs: 18000, thinkingLevel: ThinkingLevel.LOW },
+      ],
+      maxTotalBudgetMs: 27000,
+      httpTimeoutMs: 25000,
+    });
+
+    const rawDecision = parsed ?? parseModelJson(text);
+    const decision = sanitizeLockAdvisorDecisionOnServer(rawDecision, {
+      media,
+      task,
+      pinnedLocks,
+      hasImage2: Boolean(image2?.data),
+    });
+
+    res.json({ success: true, decision });
+  } catch (err: any) {
+    const msg = formatServerErrorMessage(err, 'Failed to analyze edit task with Lock Advisor.');
+    const statusCode =
+      typeof err?.status === 'number' && err.status >= 400 && err.status < 600
+        ? err.status
+        : 500;
+    res.status(statusCode).json({
+      error: msg,
+      code: typeof err?.code === 'string' ? err.code : undefined,
+    });
+  }
+});
+
 app.use('/api', (req, res) => {
   res.status(404).json({
     error: `API endpoint not found: ${req.method} ${req.originalUrl}`,

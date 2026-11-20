@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lock List</title>
+<style>
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --ink: #16202e;
+  --muted: #5d6b7e;
+  --line: #d5dce6;
+  --lock: #0f766e;
+  --lock-soft: #dff3f0;
+  --danger: #b42318;
+  --out-bg: #16202e;
+  --out-ink: #e8eef6;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151e;
+    --surface: #18212d;
+    --ink: #e8eef6;
+    --muted: #93a1b5;
+    --line: #2a3646;
+    --lock: #2dd4bf;
+    --lock-soft: #12332f;
+    --danger: #f97066;
+    --out-bg: #0a0f16;
+    --out-ink: #dbe5f1;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: env(safe-area-inset-top, 0px) 0 calc(88px + env(safe-area-inset-bottom, 0px));
+}
+header { padding: 20px 16px 8px; }
+h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.01em; }
+header p { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+.bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+.count { flex: 1; font-size: 0.9rem; color: var(--muted); }
+.count b { color: var(--lock); }
+.link {
+  background: none; border: 0; color: var(--lock); font: inherit; font-weight: 600;
+  padding: 8px 4px; cursor: pointer;
+}
+h2 { margin: 12px 16px 6px; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.list { margin: 0 12px; display: grid; gap: 8px; }
+.row {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px;
+  padding: 12px; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.row:has(input:checked) { border-color: var(--lock); background: var(--lock-soft); }
+.row:has(input:focus-visible) { outline: 3px solid var(--lock); outline-offset: 2px; }
+.row input { position: absolute; opacity: 0; pointer-events: none; }
+.box {
+  flex: none; width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--muted);
+  display: grid; place-items: center; margin-top: 1px; background: var(--surface);
+}
+.row input:checked + .box { background: var(--lock); border-color: var(--lock); }
+.box svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 3; fill: none; opacity: 0; }
+.row input:checked + .box svg { opacity: 1; }
+.name { font-weight: 650; }
+.name small { color: var(--muted); font-weight: 500; font-size: 0.8rem; margin-left: 4px; }
+.items { display: block; color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+.out-wrap { margin: 20px 12px 0; }
+.out-wrap h2 { margin-left: 4px; }
+.seg { margin: 0 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg label {
+  text-align: center; padding: 11px 4px; border: 1.5px solid var(--line); border-radius: 10px;
+  background: var(--surface); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { border-color: var(--lock); background: var(--lock-soft); color: var(--lock); }
+.seg label:has(input:focus-visible) { outline: 3px solid var(--lock); outline-offset: 2px; }
+#chg { margin: 10px 12px 0; display: none; }
+#chg.on { display: block; }
+#chg textarea {
+  width: 100%; min-height: 96px; resize: vertical; padding: 12px; border-radius: 12px;
+  border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 0.95rem;
+}
+#chg textarea:focus { outline: 3px solid var(--lock); outline-offset: 1px; border-color: var(--lock); }
+#warn { display: none; margin: 8px 4px 0; color: var(--danger); font-size: 0.85rem; font-weight: 600; }
+#warn.on { display: block; }
+#hint { margin: 6px 4px 0; color: var(--muted); font-size: 0.82rem; }
+#out {
+  background: var(--out-bg); color: var(--out-ink); border-radius: 12px; padding: 14px;
+  font: 0.8rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap; word-break: break-word; min-height: 90px; user-select: text;
+}
+#out.empty { color: var(--muted); font-family: inherit; font-size: 0.9rem; }
+.actions {
+  position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border-top: 1px solid var(--line);
+}
+.actions button {
+  flex: 1; height: 52px; border-radius: 12px; font: inherit; font-weight: 700; cursor: pointer;
+}
+#copy { background: var(--lock); color: #fff; border: 0; flex: 2; }
+#copy:disabled { opacity: .4; cursor: not-allowed; }
+#clear { background: transparent; color: var(--danger); border: 1.5px solid var(--danger); }
+.actions button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+#toast {
+  position: fixed; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(8px); background: var(--ink); color: var(--bg);
+  padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 0.9rem;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Lock list</h1>
+  <p>Tick what must stay unchanged, then copy the message into your prompt.</p>
+</header>
+
+<div class="bar">
+  <div class="count"><b id="n">0</b> locked</div>
+  <button class="link" id="all" type="button">Select all</button>
+</div>
+
+<h2>Locked elements</h2>
+<div class="list" id="cats"></div>
+
+<h2>Add-ons for edits that reveal new areas</h2>
+<div class="list" id="adds"></div>
+
+<h2>Outfit change</h2>
+<div class="seg" id="seg">
+  <label><input type="radio" name="mode" value="none" checked>No change</label>
+  <label><input type="radio" name="mode" value="text">Describe it</label>
+  <label><input type="radio" name="mode" value="image">From image</label>
+</div>
+<div id="chg">
+  <textarea id="desc"></textarea>
+  <div id="hint"></div>
+  <div id="warn">Untick [6] Clothing. It conflicts with the outfit change.</div>
+</div>
+
+<div class="out-wrap">
+  <h2>Message to copy</h2>
+  <div id="out" class="empty">Nothing selected yet.</div>
+</div>
+
+<div class="actions">
+  <button id="clear" type="button">Clear</button>
+  <button id="copy" type="button" disabled>Copy message</button>
+</div>
+<div id="toast" role="status" aria-live="polite">Copied</div>
+
+<script>
+const CATS = [
+  { id: 1, name: "Color and grade", items: [
+    "All colors in the image", "Brightness, exposure, contrast", "Saturation, hue, tint",
+    "Warmth, color temperature, color grade",
+    "No relighting, filter look, tone mapping, or enhancement" ] },
+  { id: 2, name: "Identity", items: [
+    "Face shape, bone structure, proportions", "Eyes, eyebrows, nose, lips, jawline, chin",
+    "Eye color", "Expression", "Gaze direction", "No face drift, face swap, or blending" ] },
+  { id: 3, name: "Skin", items: [
+    "Skin tone and undertone", "Texture and pores", "Marks, moles, freckles, natural lines",
+    "Natural shine and reflectivity", "No smoothing, airbrushing, or beautification" ] },
+  { id: 4, name: "Hair", items: [
+    "Hairstyle and arrangement", "Hair length, volume, density", "Hair color, roots, highlights, lowlights",
+    "Parting and hairline", "Strand direction, flow, and texture", "Loose strands and baby hairs",
+    "Hair shine and highlights", "Hair movement (video)" ] },
+  { id: 5, name: "Body and pose", items: [
+    "Body shape and proportions", "Height impression, shoulders, waist, hips, limbs", "Ears, neck",
+    "Pose and body position", "Head angle and position", "Hand and finger placement" ] },
+  { id: 6, name: "Clothing", items: [
+    "Garment type, color, fabric, pattern", "Fit, draping, folds", "Neckline, sleeves, hem",
+    "Footwear (if visible)" ] },
+  { id: 7, name: "Accessories and jewelry", items: [
+    "All existing items exactly as they appear", "Nothing added", "Nothing removed" ] },
+  { id: 8, name: "Scene", items: [
+    "Background and environment", "Objects and props", "Depth and atmosphere",
+    "Nothing added, nothing removed" ] },
+  { id: 9, name: "Lighting", items: [
+    "Light direction and quality", "Shadows and reflections", "Highlights and exposure balance" ] },
+  { id: 10, name: "Camera and technical", items: [
+    "Framing, crop, aspect ratio, resolution", "Camera angle and perspective",
+    "Lens distortion characteristics", "Sharpness and grain",
+    "No zoom, reframing, or padding", "Subject size and position in frame" ] },
+  { id: 11, name: "Realism rules", items: [
+    "Photorealistic", "No pasted, plastic, or cut-out look", "No halo or edge artifacts",
+    "No hallucinated details" ] },
+  { id: 12, name: "Output", items: [
+    "Same resolution and aspect ratio", "Looks like an unedited real photograph" ] },
+  { id: 13, name: "Video only", items: [
+    "Camera movement, no stabilizing", "Subject motion, frame by frame",
+    "Lip-sync to the original audio", "Audio, untouched and unshifted",
+    "No flickering or frame drift" ] }
+];
+const ADDS = [
+  { id: "A", name: "Newly exposed areas", items: [
+    "Revealed skin matches the person's own tone, texture, and lighting",
+    "Revealed background matches the existing one", "Natural hairline, no hard edges" ] },
+  { id: "B", name: "Blending", items: [
+    "The changed element has realistic shadows",
+    "Same sharpness, texture, and lighting as the rest of the image" ] }
+];
+
+const $ = id => document.getElementById(id);
+
+const BODY_RULES =
+"- The fit follows the person's actual body contours. The body is never reshaped, resized, or adjusted to suit the garment.\n" +
+"- The new garment's color and pattern are the one exception to the color lock. Everything else keeps its original color.\n" +
+"- The neckline, collar, or sleeves must not hide or alter the neck, ears, or hands. Existing accessories stay visible and in place.\n" +
+"- Folds, tension lines, and creases follow the existing pose and light direction.\n" +
+"- Newly visible or newly covered skin matches the person's own tone, texture, and lighting.";
+
+const IMAGE_RULES =
+"IMAGE ROLES:\n" +
+"Image 1 = the photo to edit. It is the \"original\" referred to in the lock list.\n" +
+"Image 2 = outfit reference only.\n\n" +
+"CHANGE (the only permitted edit):\n" +
+"Replace the outfit in Image 1 with the outfit worn in Image 2.\n\n" +
+"TAKE FROM IMAGE 2 (outfit only):\n" +
+"Garment type, color, fabric, pattern, cut, neckline, sleeve length, hem length, and fine details such as buttons, stitching, and embroidery.\n\n" +
+"TAKE NOTHING ELSE FROM IMAGE 2:\n" +
+"Not the person's face, body shape, pose, skin, hair, accessories, background, or lighting.\n\n" +
+"BODY PROPORTIONS ARE FIXED:\n" +
+"- Image 1's body stays exactly as it is now: height, width, shoulders, bust, waist, hips, arms, legs, and posture.\n" +
+"- Do not slim, widen, lengthen, shorten, or reshape any part of the body to suit the garment.\n" +
+"- The garment is the only thing that adapts. Re-tailor it to Image 1's exact measurements and pose, even if it fits differently from how it fit the person in Image 2.\n" +
+"- If the garment would not fit Image 1's body as it appears in Image 2, change the garment's fit, not the body.\n\n" +
+"FIT AND DRAPE:\n" +
+"- Redraw folds, tension lines, creases, and stretch for Image 1's pose. Do not copy Image 2's folds.\n" +
+"- The fabric follows Image 1's body contours: it sits where the body is and falls where gravity pulls it in Image 1's pose.\n" +
+"- Keep the garment's original cut and style, but adjust its tightness or looseness to the body in Image 1.\n" +
+"- Sleeve and hem lengths keep the proportions shown in Image 2, measured against Image 1's limbs and torso.\n\n" +
+"LIGHTING AND COLOR:\n" +
+"- Re-light the garment with Image 1's light direction, shadows, highlights, and color temperature.\n" +
+"- The garment's color and pattern from Image 2 are the one exception to the color lock. Everything else keeps its original color.\n\n" +
+"NECK, HANDS, AND ACCESSORIES:\n" +
+"- The collar, neckline, and sleeves must not hide or alter the neck, ears, or hands.\n" +
+"- Image 1's existing accessories stay visible and in place. Image 2's accessories are not carried over.\n\n" +
+"NEWLY EXPOSED OR COVERED AREAS:\n" +
+"- Skin that is newly visible or newly covered matches Image 1's person in tone, texture, and lighting.";
+
+const mode = () => document.querySelector("input[name=mode]:checked").value;
+
+function changeBlock() {
+  const m = mode(), d = $("desc").value.trim();
+  if (m === "text") {
+    return "CHANGE (the only permitted edit):\nReplace the current outfit with: " +
+      (d || "[describe the outfit: garment type, color, fabric, fit, sleeve length, neckline, length]") +
+      ".\n\n" + BODY_RULES;
+  }
+  if (m === "image") {
+    return IMAGE_RULES + (d ? "\n\nEXTRA NOTES:\n" + d : "");
+  }
+  return "";
+}
+const all = [...CATS, ...ADDS];
+
+function build(target, data) {
+  data.forEach(c => {
+    const l = document.createElement("label");
+    l.className = "row";
+    l.innerHTML =
+      '<input type="checkbox" data-id="' + c.id + '">' +
+      '<span class="box"><svg viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 4.8"/></svg></span>' +
+      '<span><span class="name">' + c.name + '<small>[' + c.id + ']</small></span>' +
+      '<span class="items">' + c.items.join(", ") + '</span></span>';
+    target.appendChild(l);
+  });
+}
+build($("cats"), CATS);
+build($("adds"), ADDS);
+
+const boxes = () => [...document.querySelectorAll("input[type=checkbox]")];
+
+function render() {
+  const picked = all.filter(c => boxes().find(b => String(c.id) === b.dataset.id).checked);
+  const locks = picked.filter(c => typeof c.id === "number");
+  const adds = picked.filter(c => typeof c.id === "string");
+  const m = mode();
+  const chg = m !== "none";
+  $("n").textContent = locks.length;
+  $("all").textContent = locks.length === CATS.length ? "Unselect all" : "Select all";
+  $("chg").classList.toggle("on", chg);
+  $("warn").classList.toggle("on", chg && boxes().find(b => b.dataset.id === "6").checked);
+  $("desc").placeholder = m === "image"
+    ? "Optional notes, e.g. keep sleeves as in Image 2"
+    : "Describe the new outfit: garment, color, fabric, fit, sleeves, neckline, length";
+  $("hint").textContent = m === "image"
+    ? "Send Image 1 (photo to edit) first, then Image 2 (outfit) in your AI app."
+    : "";
+  $("copy").disabled = picked.length === 0 && !chg;
+  const out = $("out");
+  if (!picked.length && !chg) { out.className = "empty"; out.textContent = "Nothing selected yet."; return; }
+  out.className = "";
+  const parts = [];
+  if (locks.length) {
+    let t = "STRICT LOCK INSTRUCTION\n" +
+      "The elements listed below are strictly locked. They must stay exactly as they appear " +
+      "in the original, with no changes, regeneration, or reinterpretation. Do not compromise " +
+      "on any of them for any reason, even if changing one would improve the result.\n\n";
+    locks.forEach(c => { t += "[" + c.id + "] " + c.name.toUpperCase() + "\n- " + c.items.join("\n- ") + "\n\n"; });
+    t += "Anything not listed above may change only where I explicitly instruct. " +
+      "If an instruction conflicts with a locked element, the locked element wins.";
+    parts.push(t);
+  }
+  if (chg) parts.push(changeBlock());
+  if (adds.length) {
+    let t = "ADDITIONAL REQUIREMENTS\n";
+    adds.forEach(c => { t += c.name.toUpperCase() + "\n- " + c.items.join("\n- ") + "\n\n"; });
+    parts.push(t.trimEnd());
+  }
+  out.textContent = parts.join("\n\n");
+}
+
+document.addEventListener("change", e => { if (e.target.matches("input[type=checkbox], input[name=mode]")) render(); });
+$("desc").addEventListener("input", render);
+
+$("all").addEventListener("click", () => {
+  const everyOn = CATS.every(c => boxes().find(b => String(c.id) === b.dataset.id).checked);
+  boxes().forEach(b => { if (!isNaN(b.dataset.id)) b.checked = !everyOn; });
+  render();
+});
+
+$("clear").addEventListener("click", () => {
+  boxes().forEach(b => b.checked = false);
+  document.querySelector("input[name=mode][value=none]").checked = true;
+  $("desc").value = "";
+  render();
+  toast("Cleared");
+});
+
+$("copy").addEventListener("click", async () => {
+  const text = $("out").textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (_) {}
+    ta.remove();
+  }
+  toast("Copied");
+});
+
+let tt;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 1400);
+}
+render();
+</script>
+</body>
+</html>

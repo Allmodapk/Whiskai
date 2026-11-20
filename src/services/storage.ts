@@ -9,7 +9,7 @@ import {
   ToolType,
 } from '../types';
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   CUSTOM_KEY: 'rcs_gemini_key',
   ACTIVE_PROFILE: 'rcs_active_profile_id',
   PROFILES: 'rcs_subject_profiles_v1',
@@ -24,6 +24,8 @@ const STORAGE_KEYS = {
   SETTINGS: 'rcs_settings',
   LAST_SCAN: 'rcs_last_scan_cache',
   WAITLIST_JOINED: 'rcs_waitlist_joined',
+  LOCK_ADVISOR_HISTORY: 'rcs_lock_advisor_history_v1',
+  LOCK_ADVISOR_PRESETS: 'rcs_lock_advisor_presets_v1',
 };
 
 export const DEFAULT_MASTER_SUBJECT = `South Asian woman, mid-30s to early 40s, medium-deep warm golden-brown skin with natural texture, visible pores, slight uneven tone and fine natural lines. Oval slightly elongated face, soft moderate cheekbones, gently angular soft jaw. Almond-shaped eyes with very dark brown near-black irises, natural medium lids and slight outer corner droop. Medium natural eyebrows, deep black/dark brown, gentle arch, real hair texture. Medium nose with soft rounded tip and permanent small gold stud nose pin on the LEFT nostril. Medium lips with dark natural mauve/brownish-pink pigmentation. Small natural dark mole on LEFT cheek (mid-cheek level). Deep natural black wavy-to-curly hair. No beautification, no smoothing, no brightening, no anti-aging, no identity drift.`;
@@ -227,7 +229,8 @@ export const StorageService = {
         val === 'subject_swapping' ||
         val === 'camera_controller' ||
         val === 'camera_ai' ||
-        val === 'perspective_playboard'
+        val === 'perspective_playboard' ||
+        val === 'lock_advisor'
       ) {
         return val;
       }

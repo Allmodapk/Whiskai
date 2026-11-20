@@ -42,6 +42,7 @@ import {
 import { analyzePrimarySourceImage } from '../../services/perspectivePlayboard/sourceImageAnalysis';
 import {
   formatSourceShotSizeLabel,
+  isShotSizeUncertain,
   validateTransformationConsistency,
 } from '../../services/perspectivePlayboard/comparisonAndValidation';
 import { compilePerspectivePrompt } from '../../services/perspectivePlayboard/promptCompiler';
@@ -205,10 +206,12 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
       setSourceAnalysis(analyzed);
       setCompiledPrompt(null);
     } catch (err: any) {
+      setSourceAnalysis(null);
+      setCompiledPrompt(null);
       setAnalysisError(
         extractApiErrorMessage(
           err,
-          'Visual analysis could not be completed. You can retry or continue in Camera-First mode.'
+          'Visual analysis failed completely. Your image and Playboard settings are preserved — retry or continue in Camera-First mode.'
         )
       );
     } finally {
@@ -258,7 +261,14 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
           confidence: num !== null ? 'high' : 'unknown',
         };
       } else if (field === 'shotSize') {
+        const trimmed = rawValue.trim().toLowerCase();
+        const isConcrete =
+          Boolean(trimmed) &&
+          !trimmed.startsWith('uncertain') &&
+          !trimmed.startsWith('unverified') &&
+          trimmed !== 'unknown';
         next.inferredCamera.shotSize = rawValue;
+        next.inferredCamera.shotSizeConfidence = isConcrete ? 'high' : 'unknown';
       } else if (field === 'placement') {
         next.inferredCamera.subjectPlacement = rawValue;
       }
@@ -551,14 +561,26 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
                   />
                   <div className="min-w-0">
                     <div className="text-xs font-semibold text-white flex items-center gap-1.5">
-                      {sourceAnalysis ? (
-                        <span className="text-cyan-300">Source Image Analyzed</span>
+                      {isAnalyzingImage ? (
+                        <span className="text-cyan-300">Analyzing with Gemini AI...</span>
+                      ) : analysisError ? (
+                        <span className="text-red-300">Gemini Analysis Failed</span>
+                      ) : sourceAnalysis?.isFallbackEstimate ? (
+                        <span className="text-amber-300">
+                          Local Fallback Estimate (Reduced Accuracy)
+                        </span>
+                      ) : sourceAnalysis ? (
+                        <span className="text-emerald-300">Gemini AI Analysis Verified</span>
                       ) : (
                         <span>Source Image Loaded</span>
                       )}
                     </div>
                     <div className="text-[11px] font-mono text-zinc-400 truncate tabular-nums">
-                      {sourceAnalysis
+                      {analysisError
+                        ? analysisError
+                        : sourceAnalysis?.isFallbackEstimate
+                        ? `${sourceAnalysis.observable.aspectRatioDetected} · Shot size uncertain locally`
+                        : sourceAnalysis
                         ? `Az ${sourceAnalysis.inferredCamera.azimuthDeg.value ?? '?'}° · El ${sourceAnalysis.inferredCamera.elevationDeg.value ?? '?'}° · ${sourceAnalysis.inferredCamera.shotSize}`
                         : primaryImage.name || 'Ready to inspect starting camera angle'}
                     </div>
@@ -570,14 +592,24 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
                     type="button"
                     disabled={isAnalyzingImage}
                     onClick={handleAnalyzePrimaryImage}
-                    className="min-h-[36px] px-3 py-1.5 rounded-xl bg-cyan-400/15 hover:bg-cyan-400/25 border border-cyan-400/40 text-cyan-200 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    className={`min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer border ${
+                      analysisError || sourceAnalysis?.isFallbackEstimate
+                        ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-400/45 text-amber-200'
+                        : 'bg-cyan-400/15 hover:bg-cyan-400/25 border-cyan-400/40 text-cyan-200'
+                    }`}
                   >
                     {isAnalyzingImage ? (
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <Sparkles className="w-3.5 h-3.5" />
                     )}
-                    <span>{sourceAnalysis ? 'Re-Analyze' : 'Analyze Angle'}</span>
+                    <span>
+                      {analysisError || sourceAnalysis?.isFallbackEstimate
+                        ? 'Retry Gemini'
+                        : sourceAnalysis
+                        ? 'Re-Analyze'
+                        : 'Analyze Angle'}
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -952,12 +984,18 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
                         {isAnalyzingImage ? (
                           <>
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Analyzing Perspective...</span>
+                            <span>Analyzing with Gemini...</span>
                           </>
                         ) : (
                           <>
                             <Sparkles className="w-3.5 h-3.5" />
-                            <span>{sourceAnalysis ? 'Re-Analyze Image' : 'Analyze Source Image'}</span>
+                            <span>
+                              {analysisError || sourceAnalysis?.isFallbackEstimate
+                                ? 'Retry Gemini Analysis'
+                                : sourceAnalysis
+                                ? 'Re-Analyze with Gemini'
+                                : 'Analyze Source Image'}
+                            </span>
                           </>
                         )}
                       </button>
@@ -972,20 +1010,84 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
                   </div>
                 )}
 
-                {analysisError && <StatusBanner tone="error">{analysisError}</StatusBanner>}
+                {analysisError && (
+                  <StatusBanner
+                    tone="error"
+                    title="Gemini Analysis Failed"
+                    action={
+                      primaryImage && (
+                        <button
+                          type="button"
+                          disabled={isAnalyzingImage}
+                          onClick={handleAnalyzePrimaryImage}
+                          className="min-h-[32px] px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold text-xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                        >
+                          Retry Gemini
+                        </button>
+                      )
+                    }
+                  >
+                    <div>{analysisError}</div>
+                    <div className="text-zinc-400 mt-1">
+                      Your uploaded image and all 3D Playboard camera settings remain preserved.
+                    </div>
+                  </StatusBanner>
+                )}
 
                 {sourceAnalysis && (
                   <div className="space-y-3">
-                    {sourceAnalysis.isFallbackEstimate && (
-                      <StatusBanner tone="warning">
-                        {sourceAnalysis.warningMessage ||
-                          'Live AI quota reached; values below are local estimates. Review and edit to match your photo.'}
+                    {sourceAnalysis.isFallbackEstimate ? (
+                      <StatusBanner
+                        tone="warning"
+                        title="Local Fallback Estimate Used (Reduced Accuracy)"
+                        action={
+                          primaryImage && (
+                            <button
+                              type="button"
+                              disabled={isAnalyzingImage}
+                              onClick={handleAnalyzePrimaryImage}
+                              className="min-h-[32px] px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 text-amber-100 font-semibold text-xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                            >
+                              Retry Gemini
+                            </button>
+                          )
+                        }
+                      >
+                        <div>
+                          {sourceAnalysis.warningMessage ||
+                            'Live Gemini quota reached; local fallback used (reduced accuracy).'}
+                        </div>
+                        {sourceAnalysis.quotaCause &&
+                          sourceAnalysis.quotaCause !== sourceAnalysis.warningMessage && (
+                            <div className="text-[11px] font-mono text-amber-200/80 mt-1 break-words">
+                              Cause: {sourceAnalysis.quotaCause}
+                            </div>
+                          )}
+                        <div className="text-zinc-300 mt-1">
+                          Source-image interpretation may be less accurate because Gemini did not verify visual details. Prompts will preserve your original source crop directly unless you enter values below or retry Gemini.
+                        </div>
+                      </StatusBanner>
+                    ) : (
+                      <StatusBanner
+                        tone="success"
+                        title="Gemini AI Analysis Completed"
+                        icon={<Check className="w-4 h-4 text-emerald-400" />}
+                      >
+                        <div>
+                          Source framing ({sourceAnalysis.inferredCamera.shotSize} ·{' '}
+                          {sourceAnalysis.observable.aspectRatioDetected}) and camera cues verified
+                          {sourceAnalysis.modelUsed ? ` via ${sourceAnalysis.modelUsed}` : ''}.
+                        </div>
                       </StatusBanner>
                     )}
 
                     <div className="studio-card rounded-xl p-3.5 space-y-2.5 text-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold text-white">Inferred Camera Estimates</span>
+                        <span className="font-bold text-white">
+                          {sourceAnalysis.isFallbackEstimate
+                            ? 'Source Framing & Optional Manual Overrides'
+                            : 'Inferred Camera Estimates'}
+                        </span>
                         <span className="text-[11px] text-cyan-300">Editable</span>
                       </div>
 
@@ -1315,7 +1417,12 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="studio-card rounded-xl p-4 space-y-2">
                   <div className="font-mono text-[11px] text-zinc-400 uppercase tracking-wider">
-                    Source Perspective
+                    Source Perspective{' '}
+                    {sourceAnalysis
+                      ? sourceAnalysis.isFallbackEstimate
+                        ? '(Local Fallback — Unverified)'
+                        : '(Gemini Verified)'
+                      : ''}
                   </div>
                   {sourceAnalysis ? (
                     <div className="space-y-1.5 text-zinc-200 font-mono">
@@ -1330,7 +1437,10 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
                       <div>
                         Focal: {sourceAnalysis.inferredCamera.focalLengthMm.value ?? 'Unknown'}mm
                       </div>
-                      <div>Shot Size: {sourceAnalysis.inferredCamera.shotSize}</div>
+                      <div>
+                        Shot Size: {sourceAnalysis.inferredCamera.shotSize} (
+                        {sourceAnalysis.inferredCamera.shotSizeConfidence})
+                      </div>
                       <div>Placement: {sourceAnalysis.inferredCamera.subjectPlacement}</div>
                     </div>
                   ) : (
@@ -1356,9 +1466,11 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
                     const preserveSourceFraming =
                       Boolean(sourceAnalysis) && !preservation.requireFullBodyVisibleInOutput;
                     const displayedShotSize = preserveSourceFraming
-                      ? `Preserved (${formatSourceShotSizeLabel(
-                          sourceAnalysis!.inferredCamera.shotSize
-                        )})`
+                      ? isShotSizeUncertain(sourceAnalysis)
+                        ? 'Preserved (Match original source crop — shot size uncertain)'
+                        : `Preserved (${formatSourceShotSizeLabel(
+                            sourceAnalysis!.inferredCamera.shotSize
+                          )})`
                       : targetCam.shotSize;
                     const displayedAspect =
                       preserveSourceFraming &&
@@ -1390,34 +1502,45 @@ export const PerspectivePlayboard: React.FC<PerspectivePlayboardProps> = ({
             )}
 
             {outputTrayTab === 'analysis' && (
-              <div className="studio-card rounded-xl p-4 space-y-2 text-xs">
+              <div className="studio-card rounded-xl p-4 space-y-3 text-xs">
                 {sourceAnalysis ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-zinc-300">
-                    <div>
-                      <span className="text-zinc-500 block">Subject</span>
-                      <span>{sourceAnalysis.observable.subjectDescription}</span>
+                  <>
+                    {sourceAnalysis.isFallbackEstimate && (
+                      <StatusBanner
+                        tone="warning"
+                        title="Unverified Local Fallback (Not Gemini Visual Analysis)"
+                      >
+                        {sourceAnalysis.warningMessage ||
+                          'Gemini visual analysis did not complete; entries below reflect uncertainty rather than verified image content.'}
+                      </StatusBanner>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-zinc-300">
+                      <div>
+                        <span className="text-zinc-500 block">Subject</span>
+                        <span>{sourceAnalysis.observable.subjectDescription}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block">Pose &amp; Orientation</span>
+                        <span>{sourceAnalysis.observable.poseAndOrientation}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block">Head &amp; Gaze</span>
+                        <span>{sourceAnalysis.observable.headAndGaze}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block">Clothing &amp; Accessories</span>
+                        <span>{sourceAnalysis.observable.clothingAndAccessories}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block">Environment</span>
+                        <span>{sourceAnalysis.observable.environmentAndBackground}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block">Lighting &amp; Shadows</span>
+                        <span>{sourceAnalysis.observable.lightingAndShadows}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-zinc-500 block">Pose &amp; Orientation</span>
-                      <span>{sourceAnalysis.observable.poseAndOrientation}</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-500 block">Head &amp; Gaze</span>
-                      <span>{sourceAnalysis.observable.headAndGaze}</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-500 block">Clothing &amp; Accessories</span>
-                      <span>{sourceAnalysis.observable.clothingAndAccessories}</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-500 block">Environment</span>
-                      <span>{sourceAnalysis.observable.environmentAndBackground}</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-500 block">Lighting &amp; Shadows</span>
-                      <span>{sourceAnalysis.observable.lightingAndShadows}</span>
-                    </div>
-                  </div>
+                  </>
                 ) : (
                   <p className="text-zinc-400">
                     Upload and analyze an optional primary source image in the Image tab to inspect grounded scene observations.
